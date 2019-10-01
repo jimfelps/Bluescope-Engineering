@@ -1,0 +1,1332 @@
+---
+title: "Eng MBR Charts"
+author: "Jim Felps"
+date: "6/6/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(readxl)
+library(tidyverse)
+library(ggrepel)
+library(ggthemes)
+library(wesanderson)
+
+
+mbr_charts <- read_excel("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/mbr_charts.xlsx", 
+    col_types = c("text", "numeric", "text", 
+        "text", "text", "text", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric", "numeric", "numeric", 
+        "numeric"))
+
+utilization_budget <- read_excel("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/utilization_budget.xlsx")
+
+mbr_charts$region <- factor(mbr_charts$region,
+                            levels = c("EAST",
+                                       "WEST",
+                                       "INTL",
+                                       "OS"))
+
+mbr_charts$fiscal_year <- factor(mbr_charts$fiscal_year,
+                                 levels = c("FY20",
+                                            "FY19",
+                                            "FY18"))
+
+mbr_charts$period <- factor(mbr_charts$period, 
+                            levels = c("JUL",
+                            "AUG",
+                            "SEP",
+                            "OCT",
+                            "NOV",
+                            "DEC",
+                            "JAN",
+                            "FEB",
+                            "MAR",
+                            "APR",
+                            "MAY",
+                            "JUN",
+                            "YTD"))
+
+tidy_util_budget <- utilization_budget %>%
+  gather("period", "utilization", -process_group)
+
+tidy_util_budget$period <- factor(tidy_util_budget$period, 
+                            levels = c("JUL",
+                            "AUG",
+                            "SEP",
+                            "OCT",
+                            "NOV",
+                            "DEC",
+                            "JAN",
+                            "FEB",
+                            "MAR",
+                            "APR",
+                            "MAY",
+                            "JUN",
+                            "YTD"))
+
+east <- c("ANN", "AR", "EVA", "MEM", "NC")
+west_empty <- c("CAT", "CE2", "KC1", "KC3", "KC7")
+west_kan <- c("KAN", "KC2")
+west_spc1 <- c("CE1", "KC4")
+west_spc2<- c("KC5", "RFS")
+west_bsc <- c("KC8", "KC9")
+west_other <- c("STJ", "VIS")
+intl <- c("CX", "XIAN", "IN", "MXC")
+util_spc <- c("KAN", "CE1")
+bluescope_lightblue <- "#49b4e6"
+bluescope_darkblue <- "#1e7cc1"
+bluescope_darkgray <- "#7191a9"
+bluescope_lightgray <- "#ffffff"
+bluescope_white <- "#feffff"
+custom_palette <- c(bluescope_lightblue, bluescope_darkgray)
+text_label_size <- 5
+text_vjust <- 1
+title_text <- 20
+subtitle_text <- 16
+legend_text <- 14
+point_alpha <- 0.9
+
+```
+
+
+created multiple vectors of the west process groups to filter out the empty process groups as well as group similar groups together
+
+
+```{r PHPT Graphs}
+mbr_chart_metrics_all <-  mbr_charts %>%
+  filter(fiscal_year == "FY20"| fiscal_year == "FY19") %>%
+  mutate(phpt = round(A_Hrs/Act_Tons,2),
+         utilization = round(Utilized_Hrs/Total_Hrs,2),
+         AvQ_Hrs = round(A_Hrs/Sold_Hrs,2),
+         AvQ_Tons = round(Act_Tons/Quote_Tons,2),
+         eck_ot = round(OT_ECK/num_ECK,2)) 
+mbr_chart_metrics_fy20 <- mbr_charts %>%
+  filter(fiscal_year == "FY20") %>%
+  mutate(phpt = round(A_Hrs/Act_Tons,2),
+         utilization = round(Utilized_Hrs/Total_Hrs,2),
+         AvQ_Hrs = round(A_Hrs/Sold_Hrs,2),
+         AvQ_Tons = round(Act_Tons/Quote_Tons,2),
+         eck_ot = round(OT_ECK/num_ECK,2)) 
+
+east_phpt <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% east) %>%
+  ggplot(aes(x = period, y = phpt)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = phpt)) +
+  geom_text(aes(label = phpt), vjust = text_vjust, size = text_label_size) +
+ # geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% east), 
+#             aes(x = period, y = phpt, fill = bluescope_darkgray)) +
+  facet_grid(process_group~.) +
+  labs(title = "East Region\n PHPT by Process Group") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_phpt_1 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_kan) %>%
+  ggplot(aes(x = period, y = phpt)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = phpt)) +
+  geom_text(aes(label = phpt), vjust = text_vjust, size = text_label_size) +
+  #geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% west_kan), 
+  #           aes(x = period, y = phpt, fill = bluescope_darkgray)) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n PHPT by Process Group",
+       subtitle = "KC Central") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_phpt_2 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_spc1) %>%
+  ggplot(aes(x = period, y = phpt)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = phpt)) +
+  geom_text(aes(label = phpt), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% west_spc1), 
+#        aes(x = period, y = phpt, fill = bluescope_darkgray)) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n PHPT by Process Group",
+       subtitle = "Specialty") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_phpt_3 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_spc2) %>%
+  ggplot(aes(x = period, y = phpt)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = phpt)) +
+  geom_text(aes(label = phpt), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% west_spc2), 
+#        aes(x = period, y = phpt, fill = bluescope_darkgray)) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n PHPT by Process Group",
+       subtitle = "Specialty") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_phpt_4 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_bsc) %>%
+  ggplot(aes(x = period, y = phpt)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = phpt)) +
+  geom_text(aes(label = phpt), vjust = text_vjust, size = text_label_size) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n PHPT by Process Group",
+       subtitle = "BSC") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_phpt_5 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_other) %>%
+  ggplot(aes(x = period, y = phpt)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = phpt)) +
+  geom_text(aes(label = phpt), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% west_other), 
+#             aes(x = period, y = phpt, fill = bluescope_darkgray)) +  
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n PHPT by Process Group",
+       subtitle = "STJ & VIS") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+intl_phpt <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% intl) %>%
+  ggplot(aes(x = period, y = phpt)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = phpt)) +
+  geom_text(aes(label = phpt), vjust = text_vjust, size = text_label_size) +
+ # geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% intl), 
+#             aes(x = period, y = phpt, fill = bluescope_darkgray)) +  
+  facet_grid(process_group~.) +
+  labs(title = "International Region\n PHPT by Process Group") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+OS_phpt <- mbr_chart_metrics_fy20%>%
+  filter(process_group =="OS") %>%
+  ggplot(aes(x = period, y = phpt)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = phpt)) +
+  geom_text(aes(label = phpt), vjust = text_vjust, size = text_label_size) +
+  facet_grid(process_group~.) +
+  labs(title = "Outsource Group\n PHPT by Process Group") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        strip.text = element_blank(),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        axis.text = element_text(size = legend_text))
+
+bbna_phpt <- mbr_chart_metrics_all %>%
+  group_by(Org, fiscal_year, period) %>%
+  summarise(hours = round(sum(A_Hrs),2),
+            tons = round(sum(Act_Tons),2)) %>%
+  mutate(phpt = round(hours/tons,2)) %>%
+  ggplot(aes(x = period, y = phpt, fill = fiscal_year)) + 
+  geom_bar(stat = "Identity", position = "dodge") +
+  geom_text(aes(label = phpt), vjust = text_vjust, size = text_label_size, position = position_dodge(0.9)) +
+  scale_fill_manual(values = custom_palette) +
+  labs(title = "People Hours per Ton",
+       subtitle = "BBNA Engineering") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        strip.text = element_blank(),
+        legend.text = element_text(size = legend_text),
+        legend.title = element_blank(),
+        legend.position = "top",
+        legend.direction = "horizontal",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        axis.text = element_text(size = legend_text))
+
+region_phpt <- mbr_chart_metrics_fy20 %>%
+  group_by(region, period) %>%
+  summarise(hours = round(sum(A_Hrs),2),
+            tons = round(sum(Act_Tons),2)) %>%
+  mutate(phpt = round(hours/tons,2)) %>%
+  ggplot(aes(x = period, y = phpt)) +
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = phpt)) +
+  geom_text(aes(label = phpt), vjust = text_vjust, size = text_label_size) +
+  facet_grid(region~.) +
+  labs(title = "PHPT by Region") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+print(east_phpt)
+print(west_phpt_1)
+print(west_phpt_2)
+print(west_phpt_3)
+print(west_phpt_4)
+print(west_phpt_5)
+print(intl_phpt)
+print(OS_phpt)
+print(bbna_phpt)
+print(region_phpt)
+
+```
+
+
+```{r Utilization Graphs}
+east_util_budget <- tidy_util_budget %>%
+  filter(process_group %in% east)
+west_util_budget_spc <- tidy_util_budget %>%
+  filter(process_group %in% util_spc)
+west_util_budget_spc1 <- tidy_util_budget %>%
+  filter(process_group %in% west_spc1)
+west_util_budget_spc2 <- tidy_util_budget %>%
+  filter(process_group %in% west_spc2)
+west_util_budget_other <- tidy_util_budget %>%
+  filter(process_group %in% west_other)
+intl_util_budget <- tidy_util_budget %>%
+  filter(process_group %in% intl)
+os_util_budget <- tidy_util_budget %>%
+  filter(process_group == "OS")
+bbna_util_budget <- tidy_util_budget %>%
+  filter(process_group == "BBNA")
+
+east_util <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% east) %>%
+  ggplot(aes(x = period, y = utilization)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = utilization)) +
+  geom_text(aes(label = utilization), vjust = text_vjust, size = text_label_size) +
+  facet_grid(process_group~.) +
+  labs(title = "East Region\n Utilization") +
+  scale_y_continuous(breaks=c(0.2,0.4,0.6,0.8)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_util_1 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% util_spc) %>%
+  ggplot(aes(x = period, y = utilization)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = utilization)) +
+  geom_text(aes(label = utilization), vjust = text_vjust, size = text_label_size) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n Utilization",
+       subtitle = "KC Central & Specialty") +
+  scale_y_continuous(breaks=c(0.2,0.4,0.6,0.8)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_util_2 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_spc1) %>%
+  ggplot(aes(x = period, y = utilization)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = utilization)) +
+  geom_text(aes(label = utilization), vjust = text_vjust, size = text_label_size) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n Utilization",
+       subtitle = "Specialty") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_util_3 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_spc2) %>%
+  ggplot(aes(x = period, y = utilization)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = utilization)) +
+  geom_text(aes(label = utilization), vjust = text_vjust, size = text_label_size) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n Utilization",
+       subtitle = "Specialty") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_util_4 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_bsc) %>%
+  ggplot(aes(x = period, y = utilization)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = utilization)) +
+  geom_text(aes(label = utilization), vjust = text_vjust, size = text_label_size) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n Utilization",
+       subtitle = "BSC") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_util_5 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_other) %>%
+  ggplot(aes(x = period, y = utilization)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = utilization)) +
+  geom_text(aes(label = utilization), vjust = text_vjust, size = text_label_size) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n Utilization",
+       subtitle = "STJ & VIS") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+intl_util <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% intl) %>%
+  ggplot(aes(x = period, y = utilization)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = utilization)) +
+  geom_text(aes(label = utilization), vjust = text_vjust, size = text_label_size) +
+  facet_grid(process_group~.) +
+  labs(title = "International Region\n Utilization") +
+  scale_y_continuous(breaks=c(0.2,0.4,0.6,0.8)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+OS_util <- mbr_chart_metrics_fy20%>%
+  filter(process_group =="OS") %>%
+  ggplot(aes(x = period, y = utilization)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = utilization)) +
+  geom_text(aes(label = utilization), vjust = text_vjust, size = text_label_size) +
+  facet_grid(process_group~.) +
+  labs(title = "Outsource Group\n Utilization") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        strip.text = element_blank(),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        axis.text = element_text(size = legend_text))
+
+bbna_util <- mbr_chart_metrics_all %>%
+  group_by(Org, fiscal_year, period) %>%
+  summarise(util_hours = round(sum(Utilized_Hrs),2),
+            hours = round(sum(Total_Hrs),2)) %>%
+  mutate(utilization = round(util_hours/hours,2)) %>%
+  ggplot(aes(x = period, y = utilization, fill = fiscal_year)) + 
+  geom_bar(stat = "Identity", position = "dodge") +
+  geom_text(aes(label = utilization), vjust = text_vjust, size = text_label_size, position = position_dodge(0.9)) +
+  scale_fill_manual(values = custom_palette) +
+  labs(title = "Employee Utilization",
+       subtitle = "BBNA Engineering") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        strip.text = element_blank(),
+        legend.text = element_text(size = legend_text),
+        legend.title = element_blank(),
+        legend.position = "top",
+        legend.direction = "horizontal",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        axis.text = element_text(size = legend_text))
+
+region_util <- mbr_chart_metrics_fy20 %>%
+  group_by(region, period) %>%
+  summarise(util_hours = round(sum(Utilized_Hrs),2),
+            hours = round(sum(Total_Hrs),2)) %>%
+  mutate(utilization = round(util_hours/hours,2)) %>%
+  ggplot(aes(x = period, y = utilization)) +
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = utilization)) +
+  geom_text(aes(label = utilization), vjust = text_vjust, size = text_label_size) +
+  facet_grid(region~.) +
+  labs(title = "Utilization by Region") +
+  scale_y_continuous(breaks=c(0.25,0.50,0.75,1.00)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+print(east_util)
+print(west_util_1)
+print(west_util_2)
+print(west_util_3)
+print(west_util_4)
+print(west_util_5)
+print(intl_util)
+print(OS_util)
+print(bbna_util)
+print(region_util)
+```
+
+
+
+
+```{r AvQ Hours}
+east_avq_hrs <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% east) %>%
+  ggplot(aes(x = period, y = AvQ_Hrs)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = AvQ_Hrs)) +
+  geom_text(aes(label = AvQ_Hrs), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% east), 
+#             aes(x = period, y = AvQ_Hrs, fill = bluescope_darkgray)) +
+  facet_grid(process_group~.) +
+  labs(title = "East Region\n Actual vs Quoted Hours",
+       caption = "**points denote FY19 value") +
+  scale_y_continuous(breaks=c(0.5,1.0,1.5,2.0,2.5)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_avq_hrs_1 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_kan) %>%
+  ggplot(aes(x = period, y = AvQ_Hrs)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = AvQ_Hrs)) +
+  geom_text(aes(label = AvQ_Hrs), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% west_kan), 
+#             aes(x = period, y = AvQ_Hrs, fill = bluescope_darkgray)) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n Actual vs Quoted Hours",
+       subtitle = "KC Central") +
+  scale_y_continuous(breaks=c(0.5,1.0,1.5,2.0,2.5)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_avq_hrs_2 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_spc1) %>%
+  ggplot(aes(x = period, y = AvQ_Hrs)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = AvQ_Hrs)) +
+  geom_text(aes(label = AvQ_Hrs), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% west_spc1), 
+#        aes(x = period, y = AvQ_Hrs, fill = bluescope_darkgray)) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n Actual vs Quoted Hours",
+       subtitle = "Specialty") +
+  scale_y_continuous(breaks=c(0.5,1.0,1.5,2.0,2.5)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_avq_hrs_3 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_spc2) %>%
+  ggplot(aes(x = period, y = AvQ_Hrs)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = AvQ_Hrs)) +
+  geom_text(aes(label = AvQ_Hrs), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% west_spc2), 
+#        aes(x = period, y = AvQ_Hrs, fill = bluescope_darkgray)) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n Actual vs Quoted Hours",
+       subtitle = "Specialty") +
+  scale_y_continuous(breaks=c(1,2,3)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_avq_hrs_4 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_bsc) %>%
+  ggplot(aes(x = period, y = AvQ_Hrs)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = AvQ_Hrs)) +
+  geom_text(aes(label = AvQ_Hrs), vjust = text_vjust, size = text_label_size) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n Actual vs Quoted Hours",
+       subtitle = "BSC") +
+  scale_y_continuous(breaks=c(1,2,3,4,5)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_avq_hrs_5 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_other) %>%
+  ggplot(aes(x = period, y = AvQ_Hrs)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = AvQ_Hrs)) +
+  geom_text(aes(label = AvQ_Hrs), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% west_other), 
+#             aes(x = period, y = AvQ_Hrs, fill = bluescope_darkgray)) +  
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n Actual vs Quoted Hours",
+       subtitle = "STJ & VIS") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+intl_avq_hrs <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% intl) %>%
+  ggplot(aes(x = period, y = AvQ_Hrs)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = AvQ_Hrs)) +
+  geom_text(aes(label = AvQ_Hrs), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% intl), 
+#             aes(x = period, y = AvQ_Hrs, fill = bluescope_darkgray)) +  
+  facet_grid(process_group~.) +
+  labs(title = "International Region\n Actual vs Quoted Hours") +
+  scale_y_continuous(breaks=c(0.5,1.0,1.5)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+OS_avq_hrs <- mbr_chart_metrics_fy20%>%
+  filter(process_group =="OS") %>%
+  ggplot(aes(x = period, y = AvQ_Hrs)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = AvQ_Hrs)) +
+  geom_text(aes(label = AvQ_Hrs), vjust = text_vjust, size = text_label_size) +
+  facet_grid(process_group~.) +
+  labs(title = "Outsource Group\n Actual vs Quoted Hours") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        strip.text = element_blank(),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        axis.text = element_text(size = legend_text))
+
+bbna_avq_hrs <- mbr_chart_metrics_all %>%
+  group_by(Org, fiscal_year, period) %>%
+  summarise(a_hours = round(sum(A_Hrs),2),
+            sold_hrs = round(sum(Sold_Hrs),2)) %>%
+  mutate(AvQ_Hrs = round(a_hours/sold_hrs,2)) %>%
+  ggplot(aes(x = period, y = AvQ_Hrs, fill = fiscal_year)) + 
+  geom_bar(stat = "Identity", position = "dodge") +
+  geom_text(aes(label = AvQ_Hrs), vjust = text_vjust, size = text_label_size, position = position_dodge(0.9)) +
+  scale_fill_manual(values = custom_palette) +
+  labs(title = "Actual vs Quote Hours",
+       subtitle = "BBNA Engineering") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        strip.text = element_blank(),
+        legend.text = element_text(size = legend_text),
+        legend.title = element_blank(),
+        legend.position = "top",
+        legend.direction = "horizontal",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        axis.text = element_text(size = legend_text))
+
+region_avq_hrs <- mbr_chart_metrics_fy20 %>%
+  group_by(region, period) %>%
+  summarise(a_hours = round(sum(A_Hrs),2),
+            sold_hrs = round(sum(Sold_Hrs),2)) %>%
+  mutate(AvQ_Hrs = round(a_hours/sold_hrs,2)) %>%
+  ggplot(aes(x = period, y = AvQ_Hrs)) +
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = AvQ_Hrs)) +
+  geom_text(aes(label = AvQ_Hrs), vjust = text_vjust, size = text_label_size) +
+  facet_grid(region~.) +
+  labs(title = "Actual vs Quote Hours by Region") +
+  scale_y_continuous(breaks=c(0.5,1.0,1.5)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+print(east_avq_hrs)
+print(west_avq_hrs_1)
+print(west_avq_hrs_2)
+print(west_avq_hrs_3)
+print(west_avq_hrs_4)
+print(west_avq_hrs_5)
+print(intl_avq_hrs)
+print(OS_avq_hrs)
+print(bbna_avq_hrs)
+print(region_avq_hrs)
+```
+
+
+```{r AvsQ Tons}
+east_avq_tons <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% east) %>%
+  ggplot(aes(x = period, y = AvQ_Tons)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = AvQ_Tons)) +
+  geom_text(aes(label = AvQ_Tons), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% east), 
+#             aes(x = period, y = AvQ_Tons, fill = bluescope_darkgray)) +
+  facet_grid(process_group~.) +
+  labs(title = "East Region\n Actual vs Quoted Tons") +
+  scale_y_continuous(breaks=c(0.5,1.0)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_avq_tons_1 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_kan) %>%
+  ggplot(aes(x = period, y = AvQ_Tons)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = AvQ_Tons)) +
+  geom_text(aes(label = AvQ_Tons), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% west_kan), 
+#             aes(x = period, y = AvQ_Tons, fill = bluescope_darkgray)) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n Actual vs Quoted Tons",
+       subtitle = "KC Central") +
+  scale_y_continuous(breaks=c(0.5,1.0)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_avq_tons_2 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_spc1) %>%
+  ggplot(aes(x = period, y = AvQ_Tons)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = AvQ_Tons)) +
+  geom_text(aes(label = AvQ_Tons), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% west_spc1), 
+#        aes(x = period, y = AvQ_Tons, fill = bluescope_darkgray)) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n Actual vs Quoted Tons",
+       subtitle = "Specialty") +
+  scale_y_continuous(breaks=c(0.25,0.50,0.75,1.00)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_avq_tons_3 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_spc2) %>%
+  ggplot(aes(x = period, y = AvQ_Tons)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = AvQ_Tons)) +
+  geom_text(aes(label = AvQ_Tons), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% west_spc2), 
+#        aes(x = period, y = AvQ_Tons, fill = bluescope_darkgray)) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n Actual vs Quoted Tons",
+       subtitle = "Specialty") +
+  scale_y_continuous(breaks=c(0.5,1.0,1.5)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_avq_tons_4 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_bsc) %>%
+  ggplot(aes(x = period, y = AvQ_Tons)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = AvQ_Tons)) +
+  geom_text(aes(label = AvQ_Tons), vjust = text_vjust, size = text_label_size) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n Actual vs Quoted Tons",
+       subtitle = "BSC") +
+  scale_y_continuous(breaks=c(0.5,1.0,1.5,2.0)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_avq_tons_5 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_other) %>%
+  ggplot(aes(x = period, y = AvQ_Tons)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = AvQ_Tons)) +
+  geom_text(aes(label = AvQ_Tons), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% west_other), 
+#             aes(x = period, y = AvQ_Tons, fill = bluescope_darkgray)) +  
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n Actual vs Quoted Tons",
+       subtitle = "STJ & VIS") +
+  scale_y_continuous(breaks=c(0.5,1.0,1.5)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+intl_avq_tons <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% intl) %>%
+  ggplot(aes(x = period, y = AvQ_Tons)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = AvQ_Tons)) +
+  geom_text(aes(label = AvQ_Tons), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% intl), 
+#             aes(x = period, y = AvQ_Tons, fill = bluescope_darkgray)) +  
+  facet_grid(process_group~.) +
+  labs(title = "International Region\n Act vs Quote Tons") +
+  scale_y_continuous(breaks=c(0.3,0.6,0.9)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+OS_avq_tons <- mbr_chart_metrics_fy20%>%
+  filter(process_group =="OS") %>%
+  ggplot(aes(x = period, y = AvQ_Tons)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = AvQ_Tons)) +
+  geom_text(aes(label = AvQ_Tons), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group == "OS"), 
+#             aes(x = period, y = AvQ_Tons, fill = bluescope_darkgray)) +
+  facet_grid(process_group~.) +
+  labs(title = "Outsource Group\n Act vs Quote Tons") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        strip.text = element_blank(),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        axis.text = element_text(size = legend_text))
+
+bbna_avq_tons <- mbr_chart_metrics_all %>%
+  group_by(Org, fiscal_year, period) %>%
+  summarise(Act_Tons = round(sum(Act_Tons),2),
+            Quote_Tons = round(sum(Quote_Tons),2)) %>%
+  mutate(AvQ_Tons = round(Act_Tons/Quote_Tons,2)) %>%
+  ggplot(aes(x = period, y = AvQ_Tons, fill = fiscal_year)) + 
+  geom_bar(stat = "Identity", position = "dodge") +
+  geom_text(aes(label = AvQ_Tons), vjust = text_vjust, size = text_label_size, position = position_dodge(0.9)) +
+  scale_fill_manual(values = custom_palette) +
+  labs(title = "Actual vs Quote Tons",
+       subtitle = "BBNA Engineering") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        strip.text = element_blank(),
+        legend.text = element_text(size = legend_text),
+        legend.title = element_blank(),
+        legend.position = "top",
+        legend.direction = "horizontal",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        axis.text = element_text(size = legend_text))
+
+region_avq_tons <- mbr_chart_metrics_fy20 %>%
+  group_by(region, period) %>%
+  summarise(Act_Tons = round(sum(Act_Tons),2),
+            Quote_Tons = round(sum(Quote_Tons),2)) %>%
+  mutate(AvQ_Tons = round(Act_Tons/Quote_Tons,2)) %>%
+  ggplot(aes(x = period, y = AvQ_Tons)) +
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = AvQ_Tons)) +
+  geom_text(aes(label = AvQ_Tons), vjust = text_vjust, size = text_label_size) +
+  facet_grid(region~.) +
+  labs(title = "Actual vs Quote Tons by Region") +
+  scale_y_continuous(breaks=c(0.50,1.00)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+print(east_avq_tons)
+print(west_avq_tons_1)
+print(west_avq_tons_2)
+print(west_avq_tons_3)
+#print(west_avq_tons_4)
+print(west_avq_tons_5)
+print(intl_avq_tons)
+print(OS_avq_tons)
+print(bbna_avq_tons)
+print(region_avq_tons)
+```
+
+
+```{r OT ECK}
+east_ot_eck <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% east) %>%
+  ggplot(aes(x = period, y = eck_ot)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = -eck_ot)) +
+  geom_text(aes(label = eck_ot), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% east), 
+#             aes(x = period, y = eck_ot, fill = bluescope_darkgray)) +
+  facet_grid(process_group~.) +
+  labs(title = "East Region\n On-Time ECK") +
+  scale_y_continuous(breaks=c(0.25,0.50,0.75,1.00)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_ot_eck_1 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_kan) %>%
+  ggplot(aes(x = period, y = eck_ot)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = -eck_ot)) +
+  geom_text(aes(label = eck_ot), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% west_kan), 
+#             aes(x = period, y = eck_ot, fill = bluescope_darkgray)) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n On-Time ECK",
+       subtitle = "KC Central") +
+  scale_y_continuous(breaks=c(0.25,0.50,0.75,1.00)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_ot_eck_2 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_spc1) %>%
+  ggplot(aes(x = period, y = eck_ot)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = -eck_ot)) +
+  geom_text(aes(label = eck_ot), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% west_spc1), 
+#        aes(x = period, y = eck_ot, fill = bluescope_darkgray)) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n On-Time ECK",
+       subtitle = "Specialty") +
+  scale_y_continuous(breaks=c(0.25,0.50,0.75,1.00)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_ot_eck_3 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_spc2) %>%
+  ggplot(aes(x = period, y = eck_ot)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = -eck_ot)) +
+  geom_text(aes(label = eck_ot), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% west_spc2), 
+#        aes(x = period, y = eck_ot, fill = bluescope_darkgray)) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n On-Time ECK",
+       subtitle = "Specialty") +
+  scale_y_continuous(breaks=c(0.25,0.50,0.75,1.00)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_ot_eck_4 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_bsc) %>%
+  ggplot(aes(x = period, y = eck_ot)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = -eck_ot)) +
+  geom_text(aes(label = eck_ot), vjust = text_vjust, size = text_label_size) +
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n On-Time ECK",
+       subtitle = "BSC") +
+  scale_y_continuous(breaks=c(0.25,0.50,0.75,1.00)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+west_ot_eck_5 <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% west_other) %>%
+  ggplot(aes(x = period, y = eck_ot)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = -eck_ot)) +
+  geom_text(aes(label = eck_ot), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% west_other), 
+#             aes(x = period, y = eck_ot, fill = bluescope_darkgray)) +  
+  facet_grid(process_group~.) +
+  labs(title = "West Region\n On-Time ECK",
+       subtitle = "STJ & VIS") +
+  scale_y_continuous(breaks=c(0.25,0.50,0.75,1.00)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+intl_ot_eck <- mbr_chart_metrics_fy20%>%
+  filter(process_group %in% intl) %>%
+  ggplot(aes(x = period, y = eck_ot)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = -eck_ot)) +
+  geom_text(aes(label = eck_ot), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group %in% intl), 
+#             aes(x = period, y = eck_ot, fill = bluescope_darkgray)) +  
+  facet_grid(process_group~.) +
+  labs(title = "International Region\n On-Time ECK") +
+  scale_y_continuous(breaks=c(0.25,0.50,0.75,1.00)) +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+
+OS_ot_eck <- mbr_chart_metrics_fy20%>%
+  filter(process_group =="OS") %>%
+  ggplot(aes(x = period, y = eck_ot)) + 
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = -eck_ot)) +
+  geom_text(aes(label = eck_ot), vjust = text_vjust, size = text_label_size) +
+#  geom_point(data = subset(mbr_chart_metrics_all, fiscal_year == "FY19" & process_group == "OS"), 
+#             aes(x = period, y = eck_ot, fill = bluescope_darkgray)) +
+  facet_grid(process_group~.) +
+  labs(title = "Outsource Group\n On-Time ECK") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        strip.text = element_blank(),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        axis.text = element_text(size = legend_text))
+
+bbna_ot_eck <- mbr_chart_metrics_all %>%
+  group_by(Org, fiscal_year, period) %>%
+  summarise(OT_ECK = round(sum(OT_ECK),2),
+            num_ECK = round(sum(num_ECK),2)) %>%
+  mutate(eck_ot = round(OT_ECK/num_ECK,2)) %>%
+  ggplot(aes(x = period, y = eck_ot, fill = fiscal_year)) + 
+  geom_bar(stat = "Identity", position = "dodge") +
+  geom_text(aes(label = eck_ot), vjust = text_vjust, size = text_label_size, position = position_dodge(0.9)) +
+  scale_fill_manual(values = custom_palette) +
+  labs(title = "On-Time ECK",
+       subtitle = "BBNA Engineering") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        strip.text = element_blank(),
+        legend.text = element_text(size = legend_text),
+        legend.title = element_blank(),
+        legend.position = "top",
+        legend.direction = "horizontal",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        axis.text = element_text(size = legend_text))
+
+region_ot_eck <- mbr_chart_metrics_fy20 %>%
+  group_by(region, period) %>%
+  summarise(OT_ECK = round(sum(OT_ECK),2),
+            num_ECK = round(sum(num_ECK),2)) %>%
+  mutate(eck_ot = round(OT_ECK/num_ECK,2)) %>%
+  ggplot(aes(x = period, y = eck_ot)) +
+  geom_bar(stat = "Identity", fill = bluescope_lightblue, aes(alpha = -eck_ot)) +
+  geom_text(aes(label = eck_ot), vjust = text_vjust, size = text_label_size) +
+  facet_grid(region~.) +
+  scale_y_continuous(breaks=c(0.25,0.50,0.75,1.00)) +
+  labs(title = "On-Time ECK by Region") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.subtitle = element_text(hjust = 0.5, size = subtitle_text),
+        plot.caption = element_text(size = legend_text, face = "italic"),
+        legend.position = "none",
+        panel.background = element_rect(fill = bluescope_lightgray),
+        panel.grid = element_line(color = bluescope_lightgray),
+        strip.background = element_rect(fill = bluescope_darkgray),
+        axis.text = element_text(size = legend_text),
+        strip.text = element_text(size = legend_text))
+  
+
+print(east_ot_eck)
+print(west_ot_eck_1)
+print(west_ot_eck_2)
+print(west_ot_eck_3)
+print(west_ot_eck_4)
+print(west_ot_eck_5)
+print(intl_ot_eck)
+print(OS_ot_eck)
+print(bbna_ot_eck)
+print(region_ot_eck)
+```
+
+
+
+```{r Save Graphs}
+
+## phpt charts
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/17-east_phpt.png", east_phpt, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/18-west_phpt_1.png", west_phpt_1, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/19-west_phpt_2.png", west_phpt_2, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/20-west_phpt_3.png", west_phpt_3, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/21-west_phpt_4.png", west_phpt_4, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/22-west_phpt_5.png", west_phpt_5, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/23-intl_phpt.png", intl_phpt, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/24-OS_phpt.png", OS_phpt, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/02-bbna_phpt.png", bbna_phpt, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/07-region_phpt.png", region_phpt, width = 16, height = 9, dpi = 320)
+
+## utilization charts
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/11-east_util.png", east_util, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/12-west_util_1.png", west_util_1, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/west_util_2.png", west_util_2, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/west_util_3.png", west_util_3, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/13-west_util_4.png", west_util_4, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/14-west_util_5.png", west_util_5, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/15-intl_util.png", intl_util, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/16-OS_util.png", OS_util, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/01-bbna_util.png", bbna_util, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/06-region_util.png", region_util, width = 16, height = 9, dpi = 320)
+
+## AvQ Hrs charts
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/25-east_avq_hrs.png", east_avq_hrs, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/26-west_avq_hrs_1.png", west_avq_hrs_1, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/27-west_avq_hrs_2.png", west_avq_hrs_2, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/28-west_avq_hrs_3.png", west_avq_hrs_3, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/29-west_avq_hrs_4.png", west_avq_hrs_4, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/30-west_avq_hrs_5.png", west_avq_hrs_5, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/31-intl_avq_hrs.png", intl_avq_hrs, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/32-OS_avq_hrs.png", OS_avq_hrs, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/03-bbna_avq_hrs.png", bbna_avq_hrs, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/08-region_avq_hrs.png", region_avq_hrs, width = 16, height = 9, dpi = 320)
+
+## AvQ Tons charts
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/33-east_avq_tons.png", east_avq_tons, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/34-west_avq_tons_1.png", west_avq_tons_1, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/35-west_avq_tons_2.png", west_avq_tons_2, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/36-west_avq_tons_3.png", west_avq_tons_3, width = 16, height = 9, dpi = 320)
+#ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/west_avq_tons_4.png", west_avq_tons_4, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/37-west_avq_tons_5.png", west_avq_tons_5, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/38-intl_avq_tons.png", intl_avq_tons, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/39-OS_avq_tons.png", OS_avq_tons, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/04-bbna_avq_tons.png", bbna_avq_tons, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/09-region_avq_tons.png", region_avq_tons, width = 16, height = 9, dpi = 320)
+
+## OT ECK charts
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/40-east_ot_eck.png", east_ot_eck, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/41-west_ot_eck_1.png", west_ot_eck_1, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/42-west_ot_eck_2.png", west_ot_eck_2, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/43-west_ot_eck_3.png", west_ot_eck_3, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/44-west_ot_eck_4.png", west_ot_eck_4, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/45-west_ot_eck_5.png", west_ot_eck_5, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/46-intl_ot_eck.png", intl_ot_eck, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/47-OS_ot_eck.png", OS_ot_eck, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/05-bbna_ot_eck.png", bbna_ot_eck, width = 16, height = 9, dpi = 320)
+ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/10-region_ot_eck.png", region_ot_eck, width = 16, height = 9, dpi = 320)
+
+
+```
+

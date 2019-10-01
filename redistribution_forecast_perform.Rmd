@@ -1,0 +1,123 @@
+---
+title: "Engineering Forecast Performance"
+author: "Jim Felps"
+date: "May 15, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Import GLW forecast}
+library(tidyverse)
+library(ggthemes)
+library(readxl)
+library(grid)
+library(gridExtra)
+redistribution_forecast <- read_excel("~/R/R Data/Engineering/Dashboards/redistribution_forecast.xlsx", 
+    sheet = "Tidy Forecast", skip = 1)
+
+yintercept <- 1
+text_vjust <- 1
+text_label_size <- 5
+```
+
+```{r Quick clean}
+perform_by_office <- redistribution_forecast %>%
+  select(Region, Office, Forecast, Actuals, `Percent Complete`) %>%
+  group_by(Region, Office) %>%
+  summarise(fc_redist = round(mean(Forecast),2),
+            act_redist = round(mean(Actuals),2),
+            pct_of_forecast = round(act_redist/fc_redist,2)) %>%
+  ungroup()
+
+perform_by_office$Office <- factor(perform_by_office$Office,
+                                   levels = c("AR",
+                                              "MEM",
+                                              "EVA",
+                                              "GBO",
+                                              "ANN",
+                                              "KAN",
+                                              "SPC",
+                                              "BSC",
+                                              "STJ",
+                                              "VIS",
+                                              "IN",
+                                              "MXC",
+                                              "CX",
+                                              "XIAN",
+                                              "OS"))
+
+perform_by_office$Region <- factor(perform_by_office$Region,
+                                   levels = c("EAST",
+                                              "WEST",
+                                              "INTL",
+                                              "OS",
+                                              "BBNA"))
+
+print(perform_by_office)
+
+```
+
+
+
+Now for two plots showing the performance by region and by office. I think I'll start with the regional performance charts being a stacked bar with each office.
+
+One issue that will likely come up will be the tracking of each process group within the specialty group. We aren't able to do this because all of their redistribution hits in 19215.
+
+```{r Redist performance charts}
+# red is #355C7D, blue is #F67280
+
+regional_perform <- perform_by_office %>%
+  group_by(Region) %>%
+  summarise(fc_redist = round(sum(fc_redist),2),
+            act_redist = round(sum(act_redist),2),
+            pct_of_forecast = round(act_redist/fc_redist,2)) %>%
+  ggplot(aes(x = as.factor(Region), y = pct_of_forecast, fill = Region)) +
+    geom_bar(stat = "Identity", position = "dodge") +
+    geom_hline(yintercept = yintercept) +
+    geom_text(aes(label = pct_of_forecast), vjust = text_vjust, size = text_label_size) +
+    scale_fill_manual(values = c("#355C7D", "#F67280", "#355C7D", "#355C7D", "#F67280")) +
+    theme_economist() +
+    labs(title = "Regional Redistribution \nPerformance to Forecast", y = "% of forecast", subtitle = "vs % of workdays imported") +
+    theme(plot.title = element_text(hjust = 0.5, size = 16),
+          plot.subtitle = element_text(hjust = 0.5),
+          legend.position = "none",
+          axis.title.x = element_blank(),
+          strip.text = element_text(size = 9))
+
+office_perform <- perform_by_office %>%
+  filter(Region != "BBNA") %>%
+  ggplot(aes(x = Office, y = pct_of_forecast, fill = Office)) +
+    geom_bar(stat = "Identity", position = "dodge") +
+    geom_hline(yintercept = yintercept) +
+    geom_text(aes(label = pct_of_forecast), vjust = text_vjust, size = text_label_size) +
+    scale_fill_manual(values = c("#355C7D", "#355C7D", "#355C7D", "#355C7D", "#355C7D", "#F67280", "#F67280", "#F67280", "#F67280", "#355C7D", "#355C7D", "#355C7D", "#F67280", "#355C7D", "#355C7D")) +
+    theme_economist() +
+    labs(title = "Office Performance to Forecast", y = "% of forecast") +
+    theme(plot.title = element_text(hjust = 0.5, size = 16),
+          plot.subtitle = element_text(hjust = 0.5),
+          legend.position = "none",
+          axis.title.x = element_blank(),
+          strip.text = element_text(size = 9),
+          axis.text.x = element_text(angle = -45, hjust = 0.5))
+
+grid.newpage()
+
+pushViewport(viewport(layout = grid.layout(nrow = 2, ncol = 1)))
+
+define_region <- function(row, col) {
+  viewport(layout.pos.row = row, layout.pos.col = col)
+}
+
+print(regional_perform, vp = define_region(row = 1, col = 1))
+print(office_perform, vp = define_region(row = 2, col = 1))
+
+redist_dashboard_charts <- arrangeGrob(regional_perform, office_perform, nrow = 2)
+print(redist_dashboard_charts)
+
+ggsave("~/R/Git/Project/Bluescope-Engineering/redist_perform_chart.png", redist_dashboard_charts, width = 16, height = 9, dpi = 320)
+
+```
+
