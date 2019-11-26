@@ -18,7 +18,7 @@ library(gridExtra)
 redistribution_forecast <- read_excel("~/R/R Data/Engineering/Dashboards/redistribution_forecast.xlsx", 
     sheet = "Tidy Forecast", skip = 1)
 
-yintercept <- 1
+yintercept <- 0.75
 text_vjust <- 1
 text_label_size <- 5
 ```
@@ -67,7 +67,7 @@ Now for two plots showing the performance by region and by office. I think I'll 
 One issue that will likely come up will be the tracking of each process group within the specialty group. We aren't able to do this because all of their redistribution hits in 19215.
 
 ```{r Redist performance charts}
-# red is #355C7D, blue is #F67280
+# red is #F67280, blue is #355C7D 
 
 regional_perform <- perform_by_office %>%
   group_by(Region) %>%
@@ -78,7 +78,7 @@ regional_perform <- perform_by_office %>%
     geom_bar(stat = "Identity", position = "dodge") +
     geom_hline(yintercept = yintercept) +
     geom_text(aes(label = pct_of_forecast), vjust = text_vjust, size = text_label_size) +
-    scale_fill_manual(values = c("#355C7D", "#F67280", "#355C7D", "#355C7D", "#F67280")) +
+    scale_fill_manual(values = c("#355C7D", "#355C7D", "#355C7D", "#F67280", "#355C7D")) +
     theme_economist() +
     labs(title = "Regional Redistribution \nPerformance to Forecast", y = "% of forecast", subtitle = "vs % of workdays imported") +
     theme(plot.title = element_text(hjust = 0.5, size = 16),
@@ -93,7 +93,7 @@ office_perform <- perform_by_office %>%
     geom_bar(stat = "Identity", position = "dodge") +
     geom_hline(yintercept = yintercept) +
     geom_text(aes(label = pct_of_forecast), vjust = text_vjust, size = text_label_size) +
-    scale_fill_manual(values = c("#355C7D", "#355C7D", "#355C7D", "#355C7D", "#355C7D", "#F67280", "#F67280", "#F67280", "#F67280", "#355C7D", "#355C7D", "#355C7D", "#F67280", "#355C7D", "#355C7D")) +
+    scale_fill_manual(values = c("#355C7D", "#F67280", "#355C7D", "#355C7D", "#355C7D", "#355C7D", "#355C7D", "#F67280", "#F67280", "#355C7D", "#355C7D", "#355C7D", "#F67280", "#355C7D", "#F67280")) +
     theme_economist() +
     labs(title = "Office Performance to Forecast", y = "% of forecast") +
     theme(plot.title = element_text(hjust = 0.5, size = 16),
@@ -118,6 +118,6 @@ redist_dashboard_charts <- arrangeGrob(regional_perform, office_perform, nrow = 
 print(redist_dashboard_charts)
 
 ggsave("~/R/Git/Project/Bluescope-Engineering/redist_perform_chart.png", redist_dashboard_charts, width = 16, height = 9, dpi = 320)
-
+write.csv(perform_by_office, "~/R/Git/Project/Bluescope-Engineering/perform_by_office.csv")
 ```
 

@@ -1,0 +1,365 @@
+---
+title: "Eng Complexity Bubbles"
+author: "Jim Felps"
+date: "7/8/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r FTE Engineering}
+library(tidyverse)
+library(readxl)
+library(packcircles)
+library(writexl)
+library(lubridate)
+
+bluescope_lightgray <- "#ffffff"
+title_text <- 20
+contract <- c("Contract in house", "Contract outside")
+fte <- c("Contract in house", "Direct")
+cell_recode <- c(`DVS - 0 to 100 hrs total` = "Simple",
+                 `DS - 100 to 200 hrs total` = "Moderate", 
+                 `DM - 201 to 400 hrs total` = "Complex", 
+                 `DC - 401 to 800 hrs total` = "High Complexity", 
+                 `DHC - 800+ hrs total` = "Very High Complexity", 
+                 `B1 - 0 to 100 hrs total` = "Simple", 
+                 `B2 - 0 to 100 hrs total` = "Simple", 
+                 `B3 - 0 to 100 hrs total` = "Simple", 
+                 `C1 - 100 to 200 hrs total` = "Moderate", 
+                 `D1 - 200 to 400 hrs total` = "Complex", 
+                 `E1 - 400 to 800 hrs total` = "High Complexity", 
+                 `E2 - 400 to 800 hrs total` = "High Complexity", 
+                 `F1 - 800+ hours total` = "Very High Complexity", 
+                 `F2 - 800+ hours total` = "Very High Complexity", 
+                 `F3 - 800+ hours total` = "Very High Complexity", 
+                 `G1 - 400 hrs+ & 6+Mhr/Ton` = "Very High Complexity", 
+                 `R - Roof` = "Roof")
+
+complexity_bubbles <- read_excel("~/R/R Data/Engineering/MBR Charts/complexity_bubbles.xlsx", 
+    col_types = c("skip", "text", "text", 
+        "text", "text", "text", "text", "text", 
+        "text", "text", "text", "numeric"), 
+    skip = 5)
+
+complexity_bubbles$Cell <- recode(complexity_bubbles$Cell, !!!cell_recode)
+
+complexity_bubbles$Cell <- factor(complexity_bubbles$Cell,
+                                  levels = c("Roof",
+                                             "Simple",
+                                             "Moderate",
+                                             "Complex",
+                                             "High Complexity",
+                                             "Very High Complexity"))
+
+complexColors <- c("#4f83cc", "#002f6c", "#ffbb93", "#c75b39", "#aab6fe", "#49599a")
+
+
+design_complexity_bubbles <- complexity_bubbles %>%
+  filter(`Process Group` == "Design",
+         !is.na(Cell),
+         `Active/Close` == "Active",
+         `Emp. Type` %in% fte) %>%
+  add_tally(name = "total_design") %>%
+  add_count(Cell, name = "total_by_cell") %>%
+  group_by(Cell) %>%
+  summarise(by_cell = mean(total_by_cell),
+            total = mean(total_design),
+            pct_total = round(by_cell/total,2))
+
+detail_complexity_bubbles <- complexity_bubbles %>%
+  filter(`Process Group` == "Detailing",
+         !is.na(Cell),
+         `Active/Close` == "Active",
+         `Emp. Type` %in% fte) %>%
+  add_tally(name = "total_design") %>%
+  add_count(Cell, name = "total_by_cell") %>%
+  group_by(Cell) %>%
+  summarise(by_cell = mean(total_by_cell),
+            total = mean(total_design),
+            pct_total = round(by_cell/total,2))
+
+
+## design bubbles
+design_packing <- circleProgressiveLayout(design_complexity_bubbles$pct_total, sizetype = 'area')
+design_complexity_bubbles <- cbind(design_complexity_bubbles, design_packing)
+
+design_gg <- circleLayoutVertices(design_packing, npoints = 50)
+
+ggplot() +
+  geom_polygon(data = design_gg, aes(x, y, group = id, fill = as.factor(id)), color = "black", alpha = 0.6) +
+  geom_text(data = design_complexity_bubbles, aes(x, y, label = Cell), size = 9) +
+  geom_text(data = design_complexity_bubbles, aes(x, y, label = paste0(pct_total*100,"%")), vjust = 2, size = 6) +
+  geom_segment(aes(x = 0.3, y = -0.4, xend = -0.15, yend = -0.11), size = 1, arrow = arrow(length = unit(0.03, "npc"))) +
+  geom_segment(aes(x = 0.3, y = -0.4, xend = 0.3, yend = -0.11), size = 1, arrow = arrow(length = unit(0.03, "npc"))) +
+  annotate("text", x = 0.4, y = -0.45, label = "46% of design resources are \ncapable of working on <200 hour jobs", size = 6) +
+  scale_fill_manual(breaks = c("Simple", "Moderate", "Complex", "High Complexity", "Very High Complexity"),
+                    values = c("#0e4d92", "#1034a6", "#0080ff", "#73c2fb", "#7ef9ff")) +
+  scale_size_continuous(range = c(1,4)) +
+  labs(title = "Design Full-Time + Contract (in-house)") +
+  theme(legend.position="none",
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        axis.title = element_blank(),
+        #axis.text = element_blank(),
+        #axis.ticks = element_blank(),
+        panel.background = element_rect(fill = bluescope_lightgray)) +
+  coord_equal()
+
+##detailing bubbles
+detail_packing <- circleProgressiveLayout(detail_complexity_bubbles$pct_total, sizetype = 'area')
+detail_complexity_bubbles <- cbind(detail_complexity_bubbles, detail_packing)
+
+detail_gg <- circleLayoutVertices(detail_packing, npoints = 50)
+
+ggplot() +
+  geom_polygon(data = detail_gg, aes(x, y, group = id, fill = as.factor(id)), color = "black", alpha = 0.6) +
+  geom_text(data = detail_complexity_bubbles, aes(x, y, label = Cell), size = 9) +
+  geom_text(data = detail_complexity_bubbles, aes(x, y, label = paste0(pct_total*100,"%")), vjust = 2, size = 6) +
+  scale_fill_manual(breaks = c("Roof", "Simple", "Moderate", "Complex", "High Complexity", "Very High Complexity"),
+                    values = c("#111e6c", "#0e4d92", "#1034a6", "#0080ff", "#73c2fb", "#7ef9ff")) +
+  scale_size_continuous(range = c(1,4)) +
+  labs(title = "Detailing Full-Time + Contract (in-house)") +
+  scale_color_manual(values = complexColors) +
+  theme(legend.position="none",
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.background = element_rect(fill = bluescope_lightgray)) +
+  coord_equal()
+  
+```
+
+```{r Contract Engineers}
+
+design_complexity_bubbles_contract <- complexity_bubbles %>%
+  filter(`Process Group` == "Design",
+         !is.na(Cell),
+         `Active/Close` == "Active",
+         `Emp. Type` %in% contract) %>%
+  add_tally(name = "total_design") %>%
+  add_count(Cell, name = "total_by_cell") %>%
+  group_by(Cell) %>%
+  summarise(by_cell = mean(total_by_cell),
+            total = mean(total_design),
+            pct_total = round(by_cell/total,2))
+
+detail_complexity_bubbles_contract <- complexity_bubbles %>%
+  filter(`Process Group` == "Detailing",
+         !is.na(Cell),
+         `Active/Close` == "Active",
+         `Emp. Type` %in% contract) %>%
+  add_tally(name = "total_design") %>%
+  add_count(Cell, name = "total_by_cell") %>%
+  group_by(Cell) %>%
+  summarise(by_cell = mean(total_by_cell),
+            total = mean(total_design),
+            pct_total = round(by_cell/total,2))
+
+contract_design_packing <- circleProgressiveLayout(design_complexity_bubbles_contract$pct_total, sizetype = 'area')
+design_complexity_bubbles_contract <- cbind(design_complexity_bubbles_contract, contract_design_packing)
+
+contract_design_gg <- circleLayoutVertices(contract_design_packing, npoints = 50)
+
+ggplot() +
+  geom_polygon(data = contract_design_gg, aes(x, y, group = id, fill = as.factor(id)), color = "black", alpha = 0.6) +
+  geom_text(data = design_complexity_bubbles_contract, aes(x, y, label = Cell), size = 9) +
+  geom_text(data = design_complexity_bubbles_contract, aes(x, y, label = paste0(pct_total*100,"%")), vjust = 2, size = 6) +
+  scale_size_continuous(range = c(1,4)) +
+  labs(title = "Design Contract") +
+  theme(legend.position="none",
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        axis.title = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.background = element_rect(fill = bluescope_lightgray)) +
+  coord_equal()
+
+contract_detail_packing <- circleProgressiveLayout(detail_complexity_bubbles_contract$pct_total, sizetype = 'area')
+detail_complexity_bubbles_contract <- cbind(detail_complexity_bubbles_contract, contract_detail_packing)
+
+contract_detail_gg <- circleLayoutVertices(contract_detail_packing, npoints = 50)
+
+ggplot() +
+  geom_polygon(data = contract_detail_gg, aes(x, y, group = id, fill = as.factor(id)), color = "black", alpha = 0.6) +
+  geom_text(data = detail_complexity_bubbles_contract, aes(x, y, label = Cell), size = 7) +
+  geom_text(data = detail_complexity_bubbles_contract, aes(x, y, label = paste0(pct_total*100,"%")), vjust = 2, size = 6) +
+  scale_size_continuous(range = c(1,4)) +
+  labs(title = "Detailing Contract") +
+  theme(legend.position="none",
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        axis.title = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.background = element_rect(fill = bluescope_lightgray)) +
+  coord_equal()
+```
+
+```{r Table data}
+
+print(design_complexity_bubbles)
+print(detail_complexity_bubbles)
+print(design_complexity_bubbles_contract)
+print(detail_complexity_bubbles_contract)
+
+## create list of data frames and assign names that will be used for the sheets on the write function
+eng_complex_xlsx <- list("Design FT" = design_complexity_bubbles, "Detail FT" = detail_complexity_bubbles, "Design Contract" =  design_complexity_bubbles_contract, "Detail Contract" = detail_complexity_bubbles_contract)
+
+write_xlsx(eng_complex_xlsx, path = "~/R/R Data/Engineering/eng_complex_hc.xlsx")
+```
+
+
+```{r Backlog Complex Bubbles}
+eng_complexity_lookup <- read_csv("~/R/R Data/Engineering/MBR Charts/eng_complexity_lookup.csv")
+backlog_tons_detail <- read_csv("~/R/R Data/Engineering/MBR Charts/backlog_tons_detail.csv")
+eng_backlog <- read_csv("~/R/R Data/Engineering/MBR Charts/eng_backlog.csv")
+
+#some clean up before beginning...
+
+x <- str_detect(names(eng_backlog), "Date")
+lapply(eng_backlog[,x], ymd)
+
+
+
+clar <- eng_backlog$COC_Act_Compl_Date
+des <- eng_backlog$DES_Act_Compl_Date
+dtl <- eng_backlog$DTL_Act_Compl_Date
+eck <- eng_backlog$ECK_Act_Compl_Date
+ship <- eng_backlog$`Ship AC Date`
+
+#add backlog bucket for engineering pipeline
+
+eng_backlog$eng_status <- ifelse(!is.na(ship), "Shipped",
+                                 ifelse(!is.na(eck) & is.na(ship), "MFG",
+                                        ifelse(!is.na(des) & is.na(dtl) & is.na(eck) & is.na(ship), "Detailing", 
+                                               ifelse(!is.na(clar) & is.na(des) & is.na(dtl) & is.na(eck) & is.na(ship), "Design","Clarification"))))
+
+# change the orders with scheduled ship dates of 1/1/2030 to "On Hold"
+# even if the order has been ECK'd
+# customer may request changes, requiring additional engineering resources
+
+no_val <- is.na(eng_backlog$`Ship SC Date`)
+eng_backlog$`Ship SC Date`[no_val] <- "2000-01-01"
+
+on_hold <- eng_backlog$`Ship SC Date` > "2029-10-30"
+
+eng_backlog$eng_status[on_hold] <- "On Hold"
+
+# create project number field in a given data frame
+
+eng_backlog2 <- eng_backlog %>% mutate(proj_num = str_sub(`Order Number`, 1, 8))
+
+eng_complexity <- eng_complexity_lookup %>% mutate(proj_num = str_sub(`Order Number`, 1, 8))
+
+# select only some of the columns from eng_complexity
+
+eng_complexity2 <- select(eng_complexity, c(2,3,5,6,11,12,13,14,15,16,21,24,25,26))
+
+#merge eng complexity with the eng status for all orders using a left join function
+
+eng_master <- merge(eng_backlog2, eng_complexity2, by = "proj_num", all.x = TRUE)
+
+# changes projects with missing complexity to undefined
+# when I created this script, less than 1% of orders had undefined complexity
+# these orders should be reviewed after running script
+
+no_val <- is.na(eng_master$Complexity)
+eng_master$Complexity[no_val] <- "Undefined"
+
+# change orders with zero budget hours to no engineering Budget
+
+no_val <- eng_master$`Budget Hours` == 0
+eng_master$Complexity[no_val] <- "No Engineering Budget"
+
+# only need a couple of the columns in eng_master...
+
+eng_master2 <- select(eng_master, c(1,2,5,27,31:38))
+
+# add proj_num to material backlog
+
+mat_backlog <- backlog_tons_detail %>% mutate(proj_num = str_sub(`Order Number`, 1, 8))
+
+# merge mat backlog w/ eng_master file to get a material backlog that includes an engineering complexity
+# as well as an engineering status
+
+colnames(eng_master2)[2] <- "Order"
+colnames(mat_backlog)[5] <- "Order"
+
+mat_backlog_w_eng <- merge(mat_backlog, eng_master2, by = "Order", all.x = TRUE)
+
+# update missing complexity to "Parts Order/Buyout - No Eng"
+
+no_val <- is.na(mat_backlog_w_eng$Complexity)
+mat_backlog_w_eng$Complexity[no_val] <- "Parts Order/Buyout - No Eng"
+
+# update eng_status to "No Eng"
+
+no_val <- is.na(mat_backlog_w_eng$eng_status)
+mat_backlog_w_eng$eng_status[no_val] <- "No Eng"
+
+# update shipped status to MFG (some items have shipped but order is not shipped complete)
+
+no_val <- mat_backlog_w_eng$eng_status == "Shipped"
+mat_backlog_w_eng$eng_status[no_val] <- "MFG"
+
+
+master_backlog_no_css_hs <- mat_backlog_w_eng %>% filter(substr(`Transaction Type`,1,3) != "CSS")
+
+## create summary table of backlog tons by complexity 
+
+complex_backlog <- master_backlog_no_css_hs %>%
+  group_by(Complexity) %>%
+  filter(Complexity != "Parts Order/Buyout - No Eng",
+         Complexity != "No Engineering Budget",
+         Complexity != "Undefined") %>%
+  summarise(tons = round(sum(`Total Tons`),2))
+
+complex_backlog$Complexity <- factor(complex_backlog$Complexity,
+                                     levels = c("CII/FT",
+                                                "Simple (<=100)",
+                                                "Moderate (100-200)",
+                                                "Complex (200-400)",
+                                                "High Complex (400-800)",
+                                                "Very High Complex (>800)"), ordered = TRUE)
+
+backlog_packing <- circleProgressiveLayout(complex_backlog$tons, sizetype = 'area')
+complex_backlog <- cbind(complex_backlog, backlog_packing)
+
+backlog_gg <- circleLayoutVertices(backlog_packing, npoints = 50)
+
+## export complex backlog and create pct_total column
+## need to code this next month!
+write.csv(complex_backlog, "~/R/R Data/Engineering/MBR Charts/complex_backlog.csv")
+
+ggplot() +
+  geom_polygon(data = backlog_gg, aes(x, y, group = id, fill = as.factor(id)), color = "black", alpha = 0.6) +
+  geom_text(data = complex_backlog, aes(x, y, label = Complexity), size = 6) +
+  geom_text(data = complex_backlog, aes(x, y, label = paste0(round(pct_total*100,2),"%")), vjust = 2, size = 6) +
+  geom_segment(aes(x = 100, y = -150, xend = 100, yend = -50), size = 1, arrow = arrow(length = unit(0.03, "npc"))) +
+  geom_segment(aes(x = 100, y = -150, xend = 0, yend = 100), size = 1, arrow = arrow(length = unit(0.03, "npc"))) +
+  geom_segment(aes(x = 100, y = -150, xend = 0, yend = -200), size = 1, arrow = arrow(length = unit(0.03, "npc"))) +
+  annotate("text", x = 120, y = -181, label = "71% of tons in backlog \nare budgeted for over 200 \nengineering hours", size = 3.5) +
+  scale_size_continuous(range = c(1,4)) +
+  labs(title = "Engineering Complexity of Current Backlog") +
+  scale_fill_manual(breaks = c("CII/FT", "Simple (<=100)", "Moderate (100-200)", "Complex (200-400)", "High Complex (400-800)", "Very High Complex (>800)"), values = c("#111e6c", "#0080ff", "#73c2fb", "#1034a6", "#0e4d92", "#7ef9ff")) +
+  theme(legend.position="none",
+        plot.title = element_text(hjust = 0.5, size = title_text),
+        axis.title = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank(),
+        panel.background = element_rect(fill = bluescope_lightgray)) +
+  coord_equal()
+
+
+
+```
+
