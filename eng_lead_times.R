@@ -5,6 +5,9 @@ library(readxl)
 library(extrafont)
 library(extrafontdb)
 library(ggridges)
+library(gganimate)
+library(gifski)
+library(png)
 
 fy17_eck <- c(as.Date("2016-07-01"), 
               as.Date("2016-08-01"), 
@@ -133,12 +136,16 @@ eng_backlog_select_final <- eng_backlog_select_final %>%
            eck_lead_wks <= (eck_range_high + 6) & eck_lead_wks >= eck_range_low, "Yes", "No"),
          days_to_book = round(BD_Act_Compl_Date - eck_date, 2),
          eck_month = floor_date(eck_date, "month"),
-         book_month = floor_date(BD_Act_Compl_Date, "month")) %>%
+         book_month = floor_date(BD_Act_Compl_Date, "month"),
+         fiscal_year = if_else(eck_month %in% fy17_eck, 2017,
+                               if_else(eck_month %in% fy18_eck, 2018,
+                                       if_else(eck_month %in% fy19_eck, 2019, 2020)))) %>%
   select(division,
          order_number,
          customer_name,
          proj_num,
          Complexity,
+         fiscal_year,
          eck_lead_wks,
          include,
          eck_month,
@@ -216,3 +223,27 @@ engineering_lead <- g +
                  y = 6, yend = 10.75, color = "gray20"), arrow = arrow(length = unit(0.01, "npc")), curvature = 0.25)
 
 ggsave("~/R/Git/Project/Bluescope-Engineering/engineering_lead.png", engineering_lead, width = 16, height = 9, dpi = 320)
+
+base_chart <- eng_backlog_select_final %>%
+  filter(include == "Yes") %>%
+  ggplot(aes(x = Complexity, y = eck_lead_wks, color = Complexity)) +
+  coord_flip() +
+  labs(x = NULL, y = "Engineering Lead Time in Weeks") +
+  #ggtitle("Engineering Lead Times by Complexity") +
+  theme(legend.position = "none",
+        axis.title = element_text(size = 12),
+        axis.text.x = element_text(family = "Roboto Mono", size = 10),
+        panel.grid = element_blank()) +
+  geom_jitter(size = 2, alpha = 0.25, width = 0.2) +
+  stat_summary(fun.y = mean, geom = "point", size = 5, color = "gray20")
+
+animate <- base_chart +
+  transition_states(fiscal_year,
+                    transition_length = 2,
+                    state_length = 1)
+animation <- animate +
+  ease_aes('cubic-in-out') +
+  ggtitle("{closest_state}",
+          subtitle = "Frame {frame} of {nframes}")
+
+anim_save("~/R/Git/Project/Bluescope-Engineering/animation.gif", animation = animation)
