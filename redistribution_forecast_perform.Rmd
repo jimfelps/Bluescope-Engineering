@@ -18,7 +18,7 @@ library(gridExtra)
 redistribution_forecast <- read_excel("~/R/R Data/Engineering/Dashboards/redistribution_forecast.xlsx", 
     sheet = "Tidy Forecast", skip = 1)
 
-yintercept <- 0.75
+yintercept <- 1
 text_vjust <- 1
 text_label_size <- 5
 ```
@@ -56,7 +56,6 @@ perform_by_office$Region <- factor(perform_by_office$Region,
                                               "OS",
                                               "BBNA"))
 
-print(perform_by_office)
 
 ```
 
@@ -119,5 +118,6 @@ print(redist_dashboard_charts)
 
 ggsave("~/R/Git/Project/Bluescope-Engineering/redist_perform_chart.png", redist_dashboard_charts, width = 16, height = 9, dpi = 320)
 write.csv(perform_by_office, "~/R/Git/Project/Bluescope-Engineering/perform_by_office.csv")
+perform_by_office
 ```
 
