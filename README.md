@@ -16,12 +16,12 @@ I really didn't run into any difficulties with the data until I started working 
 
 -[] figure out system for running necessary reports from BI, saving down to local folder. 
 
-  *This will allow me to start scheduling specific R scripts 
+  **This will allow me to start scheduling specific R scripts**
       
 -[] resize the MBR charts so they are final report size
 
 -[] see if there's a way to take the MBR charts that get saved and add to excel spreadsheet
 
-  *another option would be to add MBR charts to final PDF
+  **another option would be to add MBR charts to final PDF**
 
 -[] rename scripts to indicate what type they are
