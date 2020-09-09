@@ -17,12 +17,20 @@ library(ggthemes)
 library(wesanderson)
 
 
-mbr_charts <- read_excel("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/mbr_charts.xlsx", 
-    col_types = c("text", "numeric", "text", 
+
+mbr_charts <- read_excel("~/R/R Data/S&OP/Engineering/Engineering Metrics.xlsx", 
+                                        sheet = "Historical Data", col_types = c("text", "numeric", "text", 
         "text", "text", "text", "numeric", 
         "numeric", "numeric", "numeric", 
         "numeric", "numeric", "numeric", 
         "numeric"))
+
+#mbr_charts <- read_excel("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/mbr_charts.xlsx", 
+#    col_types = c("text", "numeric", "text", 
+#        "text", "text", "text", "numeric", 
+#        "numeric", "numeric", "numeric", 
+#        "numeric", "numeric", "numeric", 
+#        "numeric"))
 
 utilization_budget <- read_excel("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/utilization_budget.xlsx")
 
@@ -33,7 +41,8 @@ mbr_charts$region <- factor(mbr_charts$region,
                                        "OS"))
 
 mbr_charts$fiscal_year <- factor(mbr_charts$fiscal_year,
-                                 levels = c("FY20",
+                                 levels = c("FY21",
+                                            "FY20",
                                             "FY19",
                                             "FY18"))
 
@@ -100,14 +109,35 @@ created multiple vectors of the west process groups to filter out the empty proc
 
 ```{r PHPT Graphs}
 mbr_chart_metrics_all <-  mbr_charts %>%
-  filter(fiscal_year == "FY20"| fiscal_year == "FY19") %>%
+  filter(fiscal_year == "FY21"| fiscal_year == "FY20") %>%
+  replace_na(list(
+    A_Hrs = 0,
+    Act_Tons = 0,
+    Utilized_Hrs = 0,
+    Total_Hrs = 0,
+    Sold_Hrs = 0,
+    Quote_Tons = 0,
+    OT_ECK = 0,
+    num_ECK = 0
+  )) %>%
   mutate(phpt = round(A_Hrs/Act_Tons,2),
          utilization = round(Utilized_Hrs/Total_Hrs,2),
          AvQ_Hrs = round(A_Hrs/Sold_Hrs,2),
          AvQ_Tons = round(Act_Tons/Quote_Tons,2),
-         eck_ot = round(OT_ECK/num_ECK,2)) 
+         eck_ot = round(OT_ECK/num_ECK,2))
+
 mbr_chart_metrics_fy20 <- mbr_charts %>%
-  filter(fiscal_year == "FY20") %>%
+  filter(fiscal_year == "FY21") %>%
+  replace_na(list(
+    A_Hrs = 0,
+    Act_Tons = 0,
+    Utilized_Hrs = 0,
+    Total_Hrs = 0,
+    Sold_Hrs = 0,
+    Quote_Tons = 0,
+    OT_ECK = 0,
+    num_ECK = 0
+  )) %>%
   mutate(phpt = round(A_Hrs/Act_Tons,2),
          utilization = round(Utilized_Hrs/Total_Hrs,2),
          AvQ_Hrs = round(A_Hrs/Sold_Hrs,2),
@@ -277,6 +307,7 @@ OS_phpt <- mbr_chart_metrics_fy20%>%
         axis.text = element_text(size = legend_text))
 
 bbna_phpt <- mbr_chart_metrics_all %>%
+ # filter(!is.nan(phpt)) %>%
   group_by(Org, fiscal_year, period) %>%
   summarise(hours = round(sum(A_Hrs),2),
             tons = round(sum(Act_Tons),2)) %>%
@@ -557,8 +588,8 @@ region_util <- mbr_chart_metrics_fy20 %>%
 print(east_util)
 print(west_util_1)
 print(west_util_2)
-print(west_util_3)
-print(west_util_4)
+#print(west_util_3)
+#print(west_util_4)
 print(west_util_5)
 print(intl_util)
 print(OS_util)
@@ -1283,8 +1314,8 @@ ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/07-regio
 ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/11-east_util.png", east_util, width = 16, height = 9, dpi = 320)
 ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/12-west_util_1.png", west_util_1, width = 16, height = 9, dpi = 320)
 ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/west_util_2.png", west_util_2, width = 16, height = 9, dpi = 320)
-ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/west_util_3.png", west_util_3, width = 16, height = 9, dpi = 320)
-ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/13-west_util_4.png", west_util_4, width = 16, height = 9, dpi = 320)
+#ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/west_util_3.png", west_util_3, width = 16, height = 9, dpi = 320)
+#ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/13-west_util_4.png", west_util_4, width = 16, height = 9, dpi = 320)
 ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/14-west_util_5.png", west_util_5, width = 16, height = 9, dpi = 320)
 ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/15-intl_util.png", intl_util, width = 16, height = 9, dpi = 320)
 ggsave("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/Charts/16-OS_util.png", OS_util, width = 16, height = 9, dpi = 320)

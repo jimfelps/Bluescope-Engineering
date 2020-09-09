@@ -1,7 +1,7 @@
 ---
 title: "Engineering Forecast Performance"
 author: "Jim Felps"
-date: "May 15, 2019"
+date: "`r lubridate::now()"
 output: html_document
 ---
 
@@ -30,6 +30,11 @@ perform_by_office <- redistribution_forecast %>%
   summarise(fc_redist = round(mean(Forecast),2),
             act_redist = round(mean(Actuals),2),
             pct_of_forecast = round(act_redist/fc_redist,2)) %>%
+  mutate(
+    threshold = if_else(
+      pct_of_forecast >= yintercept, "Yes", "No"
+    )
+  ) %>%
   ungroup()
 
 perform_by_office$Office <- factor(perform_by_office$Office,
@@ -73,11 +78,18 @@ regional_perform <- perform_by_office %>%
   summarise(fc_redist = round(sum(fc_redist),2),
             act_redist = round(sum(act_redist),2),
             pct_of_forecast = round(act_redist/fc_redist,2)) %>%
-  ggplot(aes(x = as.factor(Region), y = pct_of_forecast, fill = Region)) +
+  mutate(
+    threshold_region = 
+      if_else(
+        pct_of_forecast >= yintercept, "Yes", "No"
+      )
+  ) %>%
+  ggplot(aes(x = as.factor(Region), y = pct_of_forecast, fill = threshold_region)) +
     geom_bar(stat = "Identity", position = "dodge") +
     geom_hline(yintercept = yintercept) +
     geom_text(aes(label = pct_of_forecast), vjust = text_vjust, size = text_label_size) +
-    scale_fill_manual(values = c("#355C7D", "#355C7D", "#355C7D", "#F67280", "#355C7D")) +
+    #scale_fill_manual(values = c("#355C7D", "#355C7D", "#355C7D", "#355C7D", "#355C7D")) +
+    scale_fill_manual(values = c("#F67280", "#355C7D")) +
     theme_economist() +
     labs(title = "Regional Redistribution \nPerformance to Forecast", y = "% of forecast", subtitle = "vs % of workdays imported") +
     theme(plot.title = element_text(hjust = 0.5, size = 16),
@@ -88,11 +100,12 @@ regional_perform <- perform_by_office %>%
 
 office_perform <- perform_by_office %>%
   filter(Region != "BBNA") %>%
-  ggplot(aes(x = Office, y = pct_of_forecast, fill = Office)) +
+  ggplot(aes(x = Office, y = pct_of_forecast, fill = threshold)) +
     geom_bar(stat = "Identity", position = "dodge") +
     geom_hline(yintercept = yintercept) +
     geom_text(aes(label = pct_of_forecast), vjust = text_vjust, size = text_label_size) +
-    scale_fill_manual(values = c("#355C7D", "#F67280", "#355C7D", "#355C7D", "#355C7D", "#355C7D", "#355C7D", "#F67280", "#F67280", "#355C7D", "#355C7D", "#355C7D", "#F67280", "#355C7D", "#F67280")) +
+    #scale_fill_manual(values = c("#355C7D", "#355C7D", "#F67280", "#F67280", "#355C7D", "#355C7D", "#355C7D", "#F67280", "#F67280", "#355C7D", "#355C7D", "#F67280", "#F67280", "#355C7D", "#355C7D")) +
+    scale_fill_manual(values = c("#F67280", "#355C7D")) +
     theme_economist() +
     labs(title = "Office Performance to Forecast", y = "% of forecast") +
     theme(plot.title = element_text(hjust = 0.5, size = 16),

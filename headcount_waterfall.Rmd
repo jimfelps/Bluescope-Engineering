@@ -12,11 +12,13 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 library(readxl)
 library(tidyverse)
+library(lubridate)
 library(ggthemes)
 library(wesanderson)
 library(grid)
 library(gridExtra)
 library(gtable)
+library(patchwork)
 
 bluescope_lightblue <- "#49b4e6"
 bluescope_darkgray <- "#7191a9"
@@ -26,15 +28,29 @@ waterfall_palette <- c("#49b4e6", "#7191a9", "#be5019")
 title_text <- 20
 subtitle_text <- 16
 
-period <- "OCT-19"
-fiscal_year <- "FY20"
+h1 <- c("Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+h2 <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun")
+
+month <- format(Sys.Date() - months(1), "%b")
+
+period <- str_to_upper(format(Sys.Date() - months(1), "%b-%y"))
+
+fiscal_year <- if_else(
+                  month %in% h1, 
+                  paste0("FY", format(Sys.Date() + 365, "%y")), 
+                  paste0("FY", format(Sys.Date(), "%y")))
+
+current_month <- floor_date(Sys.Date(), unit = "month")
+
 reason_code <- c("Starting Headcount", "Ending Headcount")
 
 headcount_waterfall <- read_excel("~/R/R Data/Engineering/MBR Charts/headcount_waterfall.xlsx", 
-    col_types = c("text", "text", "text", 
-        "numeric"), skip = 21)
+    sheet = "MTD", col_types = c("text", 
+        "text", "text", "numeric"), skip = 21)
 
-headcount_waterfall_ytd <- read_excel("~/R/R Data/Engineering/MBR Charts/headcount_waterfall_ytd.xlsx")
+headcount_waterfall_ytd <- read_excel("~/R/R Data/Engineering/MBR Charts/headcount_waterfall.xlsx", 
+    sheet = "YTD", col_types = c("text", 
+        "text", "numeric"))
 
 headcount_waterfall$Reason <- factor(headcount_waterfall$Reason,
                                          levels = c("Starting Headcount",
@@ -163,19 +179,20 @@ tech_waterfall_mtd <- ggplot(tech_waterfall, aes(Reason, fill = type)) +
         legend.position = "none",
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
-        #axis.text.x =  element_blank(),
+        axis.text.x =  element_text(size = 12),
         #axis.ticks.x = element_blank(),
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
         panel.background = element_rect(fill = bluescope_lightgray),
         plot.title = element_text(hjust = 0.5, size = title_text),
         plot.subtitle = element_text(hjust = 0.5, size = subtitle_text)) +
   scale_x_discrete(position = "top",  "", breaks = levels(tech_waterfall$Reason),
                    labels = strwr(levels(tech_waterfall$Reason))) +
-  labs(title = paste(period, "Engineering Headcount Changes"),
-       subtitle = "Technicians") +
+  labs(subtitle = paste0("Technicians \n(", period, " MTD)")) +
   geom_text(data = subset(tech_waterfall, type == "fav"), 
-            aes(id, end, label = scales::comma(Quantity)), vjust = 1, size = 6) +
+            aes(id, end, label = Quantity), vjust = 1, size = 6) +
   geom_text(data = subset(tech_waterfall, type == "unfav"), 
-            aes(id, end, label = scales::comma(Quantity)), vjust = 1, size = 6) +
+            aes(id, end, label = Quantity), vjust = 1, size = 6) +
   geom_text(data = subset(tech_waterfall, type == "net" & id == min(id)), 
             aes(id, end, colour = type, label = scales::comma(end), vjust = ifelse(end < start, 1, 1)), size = 6) +
   geom_text(data = subset(tech_waterfall, type == "net" & id == max(id)), 
@@ -190,18 +207,20 @@ design_waterfall_mtd <- ggplot(design_waterfall, aes(Reason, fill = type)) +
         legend.position = "none",
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
-        axis.text.x =  element_blank(),
-        axis.ticks.x = element_blank(),
+        axis.text.x =  element_text(size = 12),
+        #axis.ticks.x = element_blank(),
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
         panel.background = element_rect(fill = bluescope_lightgray),
-        plot.title = element_text(hjust = 0.5, size = title_text),
+        plot.title = element_text(size = title_text),
         plot.subtitle = element_text(hjust = 0.5, size = subtitle_text)) +
-  scale_x_discrete("", breaks = levels(design_waterfall$Reason),
+  scale_x_discrete(position = "top", "", breaks = levels(design_waterfall$Reason),
                    labels = strwr(levels(design_waterfall$Reason))) +
-  labs(subtitle = "Designers") +
+  labs(subtitle = paste0("Designers \n(", period, " MTD)")) +
   geom_text(data = subset(design_waterfall, type == "fav"), 
             aes(id, end, label = scales::comma(Quantity)), vjust = 1, size = 6) +
   geom_text(data = subset(design_waterfall, type == "unfav"), 
-            aes(id, end, label = scales::comma(Quantity)), vjust = 1, size = 6) +
+            aes(id, end, label = Quantity), vjust = 1, size = 6) +
   geom_text(data = subset(design_waterfall, type == "net" & id == min(id)), 
             aes(id, end, colour = type, label = scales::comma(end), vjust = ifelse(end < start, 1, 1)), size = 6) +
   geom_text(data = subset(design_waterfall, type == "net" & id == max(id)), 
@@ -211,19 +230,21 @@ design_waterfall_mtd <- ggplot(design_waterfall, aes(Reason, fill = type)) +
 
 engineer_waterfall_mtd <- ggplot(engineer_waterfall, aes(Reason, fill = type)) +
   geom_rect(aes(x = Reason, xmin = id - 0.45, xmax = id + 0.45, ymin = end, ymax = start)) +
-  scale_fill_manual(values = c("#7191a9", "#be5019")) +                   ######adjusted to scale_fill_manual(values = c("#7191a9", "#be5019")) when only unfav and scale_fill_manual(values = c("#7191a9", "#49b4e6")) when only fav exists
+  scale_fill_manual(values = c("#7191a9", "#be5019")) +                  ######adjusted to scale_fill_manual(values = c("#7191a9", "#be5019")) when only unfav and scale_fill_manual(values = c("#7191a9", "#49b4e6")) when only fav exists
   theme(axis.title = element_blank(), 
         legend.position = "none",
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
-        axis.text.x =  element_blank(),
-        axis.ticks.x = element_blank(),
+        axis.text.x =  element_text(size = 12),
+        #axis.ticks.x = element_blank(),
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
         panel.background = element_rect(fill = bluescope_lightgray),
         plot.title = element_text(hjust = 0.5, size = title_text),
         plot.subtitle = element_text(hjust = 0.5, size = subtitle_text)) +
-  scale_x_discrete("", breaks = levels(engineer_waterfall$Reason),
+  scale_x_discrete(position = "top", "", breaks = levels(engineer_waterfall$Reason),
                    labels = strwr(levels(engineer_waterfall$Reason))) +
-  labs(subtitle = "Engineers") +
+  labs(subtitle = paste0("Engineers \n(", period, " MTD)")) +
   geom_text(data = subset(engineer_waterfall, type == "fav"), 
             aes(id, end, label = scales::comma(Quantity)), vjust = 1, size = 6) +
   geom_text(data = subset(engineer_waterfall, type == "unfav"), 
@@ -242,19 +263,20 @@ tech_waterfall_ytd_plot <- ggplot(tech_waterfall_ytd, aes(Reason, fill = type)) 
         legend.position = "none",
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
-        #axis.text.x =  element_blank(),
+        axis.text.x =  element_blank(),
         #axis.ticks.x = element_blank(),
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
         panel.background = element_rect(fill = bluescope_lightgray),
         plot.title = element_text(hjust = 0.5, size = title_text),
         plot.subtitle = element_text(hjust = 0.5, size = subtitle_text)) +
-  scale_x_discrete(position = "top",  "", breaks = levels(tech_waterfall_ytd$Reason),
+  scale_x_discrete("", breaks = levels(tech_waterfall_ytd$Reason),
                    labels = strwr(levels(tech_waterfall_ytd$Reason))) +
-  labs(title = paste(fiscal_year, "Engineering Headcount Changes"),
-       subtitle = "Technicians") +
+  labs(subtitle = paste0(fiscal_year, " YTD")) +
   geom_text(data = subset(tech_waterfall_ytd, type == "fav"), 
-            aes(id, end, label = scales::comma(Quantity)), vjust = 1, size = 6) +
+            aes(id, end, label = Quantity), vjust = 1, size = 6) +
   geom_text(data = subset(tech_waterfall_ytd, type == "unfav"), 
-            aes(id, end, label = scales::comma(Quantity)), vjust = 1, size = 6) +
+            aes(id, end, label = Quantity), vjust = 1, size = 6) +
   geom_text(data = subset(tech_waterfall_ytd, type == "net" & id == min(id)), 
             aes(id, end, colour = type, label = scales::comma(end), vjust = ifelse(end < start, 1, 1)), size = 6) +
   geom_text(data = subset(tech_waterfall_ytd, type == "net" & id == max(id)), 
@@ -271,16 +293,18 @@ design_waterfall_ytd_plot <- ggplot(design_waterfall_ytd, aes(Reason, fill = typ
         axis.ticks.y = element_blank(),
         axis.text.x =  element_blank(),
         axis.ticks.x = element_blank(),
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
         panel.background = element_rect(fill = bluescope_lightgray),
         plot.title = element_text(hjust = 0.5, size = title_text),
         plot.subtitle = element_text(hjust = 0.5, size = subtitle_text)) +
   scale_x_discrete("", breaks = levels(design_waterfall_ytd$Reason),
                    labels = strwr(levels(design_waterfall_ytd$Reason))) +
-  labs(subtitle = "Designers") +
+  labs(subtitle = paste0(fiscal_year, " YTD")) +
   geom_text(data = subset(design_waterfall_ytd, type == "fav"), 
-            aes(id, end, label = scales::comma(Quantity)), vjust = 1, size = 6) +
+            aes(id, end, label = Quantity), vjust = 1, size = 6) +
   geom_text(data = subset(design_waterfall_ytd, type == "unfav"), 
-            aes(id, end, label = scales::comma(Quantity)), vjust = 1, size = 6) +
+            aes(id, end, label = Quantity), vjust = 1, size = 6) +
   geom_text(data = subset(design_waterfall_ytd, type == "net" & id == min(id)), 
             aes(id, end, colour = type, label = scales::comma(end), vjust = ifelse(end < start, 1, 1)), size = 6) +
   geom_text(data = subset(design_waterfall_ytd, type == "net" & id == max(id)), 
@@ -290,23 +314,25 @@ design_waterfall_ytd_plot <- ggplot(design_waterfall_ytd, aes(Reason, fill = typ
 
 engineer_waterfall_ytd_plot <- ggplot(engineer_waterfall_ytd, aes(Reason, fill = type)) +
   geom_rect(aes(x = Reason, xmin = id - 0.45, xmax = id + 0.45, ymin = end, ymax = start)) +
-  scale_fill_manual(values = waterfall_palette) +                   ######adjusted to scale_fill_manual(values = c("#7191a9", "#be5019")) when only unfav and scale_fill_manual(values = c("#7191a9", "#49b4e6")) when only fav exists (values = waterfall_palette) when both exist
+  scale_fill_manual(values = c("#7191a9", "#be5019")) +                   ######adjusted to scale_fill_manual(values = c("#7191a9", "#be5019")) when only unfav and scale_fill_manual(values = c("#7191a9", "#49b4e6")) when only fav exists (values = waterfall_palette) when both exist
   theme(axis.title = element_blank(), 
         legend.position = "none",
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
         axis.text.x =  element_blank(),
         axis.ticks.x = element_blank(),
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
         panel.background = element_rect(fill = bluescope_lightgray),
         plot.title = element_text(hjust = 0.5, size = title_text),
         plot.subtitle = element_text(hjust = 0.5, size = subtitle_text)) +
   scale_x_discrete("", breaks = levels(engineer_waterfall_ytd$Reason),
                    labels = strwr(levels(engineer_waterfall_ytd$Reason))) +
-  labs(subtitle = "Engineers") +
+  labs(subtitle = paste0(fiscal_year, " YTD")) +
   geom_text(data = subset(engineer_waterfall_ytd, type == "fav"), 
-            aes(id, end, label = scales::comma(Quantity)), vjust = 1, size = 6) +
+            aes(id, end, label = Quantity), vjust = 1, size = 6) +
   geom_text(data = subset(engineer_waterfall_ytd, type == "unfav"), 
-            aes(id, end, label = scales::comma(Quantity)), vjust = 1, size = 6) +
+            aes(id, end, label = Quantity), vjust = 1, size = 6) +
   geom_text(data = subset(engineer_waterfall_ytd, type == "net" & id == min(id)), 
             aes(id, end, colour = type, label = scales::comma(end), vjust = ifelse(end < start, 1, 1)), size = 6) +
   geom_text(data = subset(engineer_waterfall_ytd, type == "net" & id == max(id)), 
@@ -336,6 +362,8 @@ print(engineer_waterfall_mtd, vp = define_region(row = 3, col = 1))
 
 headcount_mtd_one_page <- arrangeGrob(tech_waterfall_mtd, design_waterfall_mtd, engineer_waterfall_mtd, nrow = 3)
 
+headcount_patchwork <- tech_waterfall_mtd / design_waterfall_mtd / engineer_waterfall_mtd
+headcount_patchwork
 ggsave("~/R/R Data/Engineering/headcount_mtd_one_page.png", headcount_mtd_one_page, width = 16, height = 9, dpi = 320)
 
 print(headcount_mtd_one_page)
@@ -354,10 +382,22 @@ print(tech_waterfall_ytd_plot, vp = define_region(row = 1, col = 1))
 print(design_waterfall_ytd_plot, vp = define_region(row = 2, col = 1))
 print(engineer_waterfall_ytd_plot, vp = define_region(row = 3, col = 1))
 
+# headcount_patchwork_ytd <- tech_waterfall_ytd_plot / design_waterfall_ytd_plot / engineer_waterfall_ytd_plot
+# headcount_patchwork_ytd
 headcount_ytd_one_page <- arrangeGrob(tech_waterfall_ytd_plot, design_waterfall_ytd_plot, engineer_waterfall_ytd_plot, nrow = 3)
 
 ggsave("~/R/R Data/Engineering/headcount_ytd_one_page.png", headcount_ytd_one_page, width = 16, height = 9, dpi = 320)
 
 print(headcount_ytd_one_page)
+```
+
+```{r}
+headcount_patchwork_tech <- tech_waterfall_mtd / tech_waterfall_ytd_plot
+headcount_patchwork_engineering <- (design_waterfall_mtd / design_waterfall_ytd_plot) | (engineer_waterfall_mtd / engineer_waterfall_ytd_plot)
+headcount_patchwork_tech
+headcount_patchwork_engineering
+
+ggsave("~/R/R Data/Engineering/MBR Charts/headcount_patchwork_tech.png", headcount_patchwork_tech, width = 16, height = 9, dpi = "retina")
+ggsave("~/R/R Data/Engineering/MBR Charts/headcount_patchwork_engineering.png", headcount_patchwork_engineering, width = 16, height = 9, dpi = "retina")
 ```
 

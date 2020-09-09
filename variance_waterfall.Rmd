@@ -19,8 +19,8 @@ bluescope_lightgray <- "#ffffff"
 waterfall_palette <- c("#49b4e6", "#7191a9", "#be5019")
 title_text <- 20
 subtitle_text <- 16
-current_month <- "Oct"
-current_year <- "2019"
+current_month <- "Aug"
+current_year <- "2020"
 
 variance_waterfall_mtd <- read_excel("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/variance_waterfall_mtd.xlsx")
 variance_waterfall_ytd <- read_excel("C:/Users/felpj/Documents/R/R Data/Engineering/MBR Charts/variance_waterfall_ytd.xlsx")
@@ -36,6 +36,7 @@ variance_waterfall_mtd$desc <- factor(variance_waterfall_mtd$desc,
                                                     "OS EXP",
                                                     "OS CHGS",
                                                     "ENG ADMIN EXP",
+                                                    "ENG ADMIN CHGS",
                                                     "OTHER",
                                                     "ACTUAL"))
 variance_waterfall_mtd$id <- seq_along(variance_waterfall_mtd$amount)
@@ -62,6 +63,7 @@ variance_waterfall_ytd$desc <- factor(variance_waterfall_ytd$desc,
                                                  "OS EXP",
                                                  "OS CHGS",
                                                  "ENG ADMIN EXP",
+                                                 "ENG ADMIN CHGS",
                                                  "OTHER",
                                                  "ACTUAL"))
 variance_waterfall_ytd$id <- seq_along(variance_waterfall_ytd$amount)
@@ -74,6 +76,15 @@ variance_waterfall_ytd$start <- c(0, head(variance_waterfall_ytd$end, -1)) ## ze
 variance_waterfall_ytd <- variance_waterfall_ytd[,c(3,1,4,6,5,2)]
 
 variance_waterfall_ytd$type <- as.factor(variance_waterfall_ytd$type)
+
+variance_waterfall_mtd <- variance_waterfall_mtd %>%
+  mutate(start = round(start,0),
+         end = round(end,0),
+         amount = round(amount,0))
+variance_waterfall_ytd <- variance_waterfall_ytd %>%
+  mutate(start = round(start,0),
+         end = round(end,0),
+         amount = round(amount,0))
 ```
 
 
@@ -88,6 +99,8 @@ waterfall_mtd <- ggplot(variance_waterfall_mtd, aes(desc, fill = type)) +
         legend.position = "none",
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
         panel.background = element_rect(fill = bluescope_lightgray),
         plot.title = element_text(hjust = 0.5, size = title_text),
         plot.subtitle = element_text(hjust = 0.5, size = subtitle_text)) +
@@ -96,9 +109,9 @@ waterfall_mtd <- ggplot(variance_waterfall_mtd, aes(desc, fill = type)) +
   labs(title = paste("Engineering OH Variance", current_month, current_year, sep = " "),
        subtitle = "Forcast to Actual") +
   geom_text(data = subset(variance_waterfall_mtd, type == "fav"), 
-            aes(id, end, label = scales::comma(amount)), vjust = 1, size = 3) +
+            aes(id, end, label = round(amount)), vjust = 1, size = 3.5) +
   geom_text(data = subset(variance_waterfall_mtd, type == "unfav"), 
-            aes(id, end, label = scales::comma(amount)), vjust = -0.3, size = 3) +
+            aes(id, end, label = round(amount)), vjust = -0.3, size = 3.5) +
   geom_text(data = subset(variance_waterfall_mtd, type == "net" & id == min(id)), 
             aes(id, end, colour = type, label = scales::comma(end), vjust = ifelse(end < start, 1, -0.3)), size = 3.5) +
   geom_text(data = subset(variance_waterfall_mtd, type == "net" & id == max(id)), 
@@ -111,17 +124,19 @@ waterfall_ytd <- ggplot(variance_waterfall_ytd, aes(desc, fill = type)) +
         legend.position = "none",
         axis.text.y = element_blank(),
         axis.ticks.y = element_blank(),
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
         panel.background = element_rect(fill = bluescope_lightgray),
         plot.title = element_text(hjust = 0.5, size = title_text),
         plot.subtitle = element_text(hjust = 0.5, size = subtitle_text)) +
   scale_x_discrete("", breaks = levels(variance_waterfall_ytd$desc),
                    labels = strwr(levels(variance_waterfall_ytd$desc))) +
-  labs(title = "Engineering OH Variance FY20",
+  labs(title = "Engineering OH Variance FY21",
        subtitle = "Target to Actual") +
   geom_text(data = subset(variance_waterfall_ytd, type == "fav"), 
-            aes(id, end, label = scales::comma(amount)), vjust = 1, size = 3) +
+            aes(id, end, label = round(amount)), vjust = 1, size = 3.5) +
   geom_text(data = subset(variance_waterfall_ytd, type == "unfav"), 
-            aes(id, end, label = scales::comma(amount)), vjust = -0.3, size = 3) +
+            aes(id, end, label = scales::comma(amount)), vjust = -0.3, size = 3.5) +
   geom_text(data = subset(variance_waterfall_ytd, type == "net" & id == min(id)), 
             aes(id, end, colour = type, label = scales::comma(end), vjust = ifelse(end < start, 1, -0.3)), size = 3.5) +
   geom_text(data = subset(variance_waterfall_ytd, type == "net" & id == max(id)), 

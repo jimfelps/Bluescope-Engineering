@@ -77,7 +77,7 @@ eng_backlog_v2 <- read_csv("~/R/R Data/Engineering/MBR Charts/eng_backlog_v2.csv
                            col_types = cols(`Order Creation Date` = col_date(format = "%m/%d/%Y"), 
                                             `Order Number` = col_character(), 
                                             `ECK Date` = col_date(format = "%m/%d/%Y"),
-                                            `BD_Act_Compl_Date` = col_date(format = "%m/%d/%Y")))
+                                            `BD_Act_Compl_Date` = col_date(format = "%m/%d/%Y"))) #this is just the engineering complexity lookup. Seems I don't need the lookup in this script but it was late and I copied it from another script
 
 # create project number field in a given data frame
 
@@ -105,38 +105,40 @@ eng_complexity$Complexity[no_val] <- "No Engineering Budget"
 eng_backlog_select <- eng_backlog_v2 %>% 
   mutate(proj_num = str_sub(`Order Number`, 1, 8)) %>%
   filter(substr(`Transaction Type`,1,3) != "CSS") %>% #take out CSS jobs from the start since they have their own engineering resources
-  left_join(eng_complexity, by = c("proj_num" = "proj_num")) %>%
-  select(Division.x,
-         `Order Number.x`,
-         #Region,
-         `Customer Name`,
+  #left_join(eng_complexity, by = c("proj_num" = "proj_num")) %>%
+  select(Division,
+         `Order Number`,
+         Region,
+         #`Customer Name`,
          proj_num,
          `Order Creation Date`,
-         `ECK Date`,
+         ECK_Date,
          BD_Act_Compl_Date,
-         `Budget Hours.x`,
-         `Actual Hours.x`,
+         `Budget Hours`,
+         `Actual Hours`,
          Complexity) %>%
-  rename("division" = "Division.x",
-         "order_number" = "Order Number.x",
-         "customer_name" = "Customer Name",
+  rename("division" = "Division",
+         "order_number" = "Order Number",
+         #"customer_name" = "Customer Name",
          "order_create_date" = "Order Creation Date",
-         "eck_date" = "ECK Date",
-         "budget_hours" = "Budget Hours.x",
-         "acutal_hours" = "Actual Hours.x")
+         "eck_date" = "ECK_Date",
+         "budget_hours" = "Budget Hours",
+         "acutal_hours" = "Actual Hours",
+         "complexity" = "Complexity",
+         "division" = "Division")
 
 # could filter out NA's in the code above but this will give visibility into what's filtered
 # when I wrote this, the NA's were BLA region trx as well as BSC I/C orders and a couple intl I/C orders
 eng_backlog_na <- eng_backlog_select %>%
-  filter(is.na(Complexity))
+  filter(is.na(complexity))
 
 no_budget_no_eck <- eng_backlog_select %>%
-       filter(Complexity == "No Engineering Budget" &
+       filter(complexity == "No Engineering Budget" &
                 is.na(eck_date))
 
 eng_backlog_select_final <- eng_backlog_select %>%
-  filter(!is.na(Complexity),
-         Complexity != "No Engineering Budget",
+  filter(!is.na(complexity),
+         complexity != "No Engineering Budget",
          !is.na(eck_date),
          budget_hours >= 15)
 
@@ -171,9 +173,9 @@ eng_backlog_select_final <- eng_backlog_select_final %>%
                                        if_else(eck_month %in% fy19_eck, 2019, 2020)))) %>%
   select(division,
          order_number,
-         customer_name,
+         #customer_name,
          proj_num,
-         Complexity,
+         complexity,
          fiscal_year,
          eck_lead_wks,
          include,
@@ -184,7 +186,7 @@ eng_backlog_select_final <- eng_backlog_select_final %>%
 
 eng_backlog_select_final$eck_lead_wks <- as.numeric(eng_backlog_select_final$eck_lead_wks)
 
-eng_backlog_select_final$Complexity <- factor(eng_backlog_select_final$Complexity,
+eng_backlog_select_final$complexity <- factor(eng_backlog_select_final$complexity,
                                               levels = c("CII/FT",
                                                          "Simple (<=100)",
                                                          "Moderate (100-200)",
@@ -199,25 +201,25 @@ lead_time_avg <- eng_backlog_select_final %>%
   pull(avg)
 
 fy20_lead_time_avg <- eng_backlog_select_final %>%
-  group_by(Complexity) %>%
+  group_by(complexity) %>%
   filter(include == "Yes",
          eck_month %in% fy20_eck) %>%
   summarise(avg = mean(eck_lead_wks, na.rm = TRUE)) %>%
   ungroup()
 fy19_lead_time_avg <- eng_backlog_select_final %>%
-  group_by(Complexity) %>%
+  group_by(complexity) %>%
   filter(include == "Yes",
          eck_month %in% fy19_eck) %>%
   summarise(avg = mean(eck_lead_wks, na.rm = TRUE)) %>%
   ungroup()
 fy18_lead_time_avg <- eng_backlog_select_final %>%
-  group_by(Complexity) %>%
+  group_by(complexity) %>%
   filter(include == "Yes",
          eck_month %in% fy18_eck) %>%
   summarise(avg = mean(eck_lead_wks, na.rm = TRUE)) %>%
   ungroup()
 fy17_lead_time_avg <- eng_backlog_select_final %>%
-  group_by(Complexity) %>%
+  group_by(complexity) %>%
   filter(include == "Yes",
          eck_month %in% fy17_eck) %>%
   summarise(avg = mean(eck_lead_wks, na.rm = TRUE)) %>%
@@ -229,7 +231,7 @@ theme_set(theme_light(base_size = 15, base_family = "Poppins"))
 
 all_points <- eng_backlog_select_final %>%
   filter(include == "Yes") %>%
-  ggplot(aes(x = Complexity, y = eck_lead_wks, color = Complexity)) +
+  ggplot(aes(x = complexity, y = eck_lead_wks, color = complexity)) +
     coord_flip() +
     labs(x = NULL, y = "Engineering Lead Time in Weeks") +
     #ggtitle("Engineering Lead Times by Complexity") +
@@ -244,8 +246,9 @@ engineering_lead <- all_points +
   geom_jitter(size = 2, alpha = 0.25, width = 0.2) +
   #stat_summary(fun.y = mean, geom = "point", size = 5, color = "gray20") +
   scale_color_manual(values = c("#F8971F", "#FFD600", "#8A8D8F", "#BF5700", "#579D42", "#00A9B7", "#005F86", "#CFB500")) +
-  geom_point(data = fy20_lead_time_avg, aes(x = Complexity, y = avg, color = "gray20", size = 4)) +
-  geom_point(data = fy17_lead_time_avg, aes(x = Complexity, y = avg, color = "red", size = 4)) +
+  geom_point(data = fy20_lead_time_avg, aes(x = complexity, y = avg, color = "gray20", size = 4)) +
+  geom_point(data = fy17_lead_time_avg, aes(x = complexity, y = avg, color = "red", size = 4)) +
+  scale_y_continuous(breaks=c(5,10,15,20,25,30,35,40,45,50)) +
   #geom_point(data = fy19_lead_time_avg, aes(x = Complexity, y = avg, color = "F8B195", size = 4, alpha = 0.8)) +
   annotate("text", x = 6.4, y = 36, family = "Poppins", size = 2.7, color = "gray20",
            label = "Large teal dots represent FY17 average \nlead time by complexity") +
@@ -265,7 +268,7 @@ ggsave("~/R/Git/Project/Bluescope-Engineering/engineering_lead.png", engineering
 
 base_chart <- eng_backlog_select_final %>%
   filter(include == "Yes") %>%
-  ggplot(aes(x = Complexity, y = eck_lead_wks, color = Complexity)) +
+  ggplot(aes(x = complexity, y = eck_lead_wks, color = complexity)) +
   coord_flip() +
   labs(x = NULL, y = "Engineering Lead Time in Weeks") +
   #ggtitle("Engineering Lead Times by Complexity") +
@@ -292,14 +295,14 @@ anim_save("~/R/Git/Project/Bluescope-Engineering/animation.gif", animation = ani
 
 # next I'm going to look just at the past 12 months to see if we find any improvement in lead time avg
 ltm_max <- eng_backlog_select_final %>%
-  group_by(Complexity, eck_month) %>%
+  group_by(complexity, eck_month) %>%
   filter(include == "Yes",
          eck_month %in% ltm_eck) %>%
   summarise(avg = mean(eck_lead_wks, na.rm = TRUE)) %>%
   filter(eck_month == max(eck_month)) %>%
   ungroup()
 ltm_min <- eng_backlog_select_final %>%
-  group_by(Complexity, eck_month) %>%
+  group_by(complexity, eck_month) %>%
   filter(include == "Yes",
          eck_month %in% ltm_eck) %>%
   summarise(avg = mean(eck_lead_wks, na.rm = TRUE)) %>%
@@ -315,7 +318,7 @@ ltm_lead_time_avg <- eng_backlog_select_final %>%
 ltm_points <- eng_backlog_select_final %>%
   filter(include == "Yes",
          eck_month %in% ltm_eck) %>%
-  ggplot(aes(x = Complexity, y = eck_lead_wks, color = Complexity)) +
+  ggplot(aes(x = complexity, y = eck_lead_wks, color = complexity)) +
   coord_flip() +
   labs(x = NULL, y = "Engineering Lead Time in Weeks") +
   #ggtitle("Engineering Lead Times by Complexity") +
@@ -330,8 +333,9 @@ engineering_lead_ltm <- ltm_points +
   geom_jitter(size = 2, alpha = 0.25, width = 0.2) +
   #stat_summary(fun.y = mean, geom = "point", size = 5, color = "gray20") +
   scale_color_manual(values = c("#F8971F", "#FFD600", "#8A8D8F", "#BF5700", "#579D42", "#00A9B7", "#005F86", "#CFB500")) +
-  geom_point(data = ltm_max, aes(x = Complexity, y = avg, color = "gray20", size = 4)) +
-  geom_point(data = ltm_min, aes(x = Complexity, y = avg, color = "red", size = 4)) +
+  scale_y_continuous(breaks=c(5,10,15,20,25,30,35,40,45,50)) +
+  geom_point(data = ltm_max, aes(x = complexity, y = avg, color = "gray20", size = 4)) +
+  geom_point(data = ltm_min, aes(x = complexity, y = avg, color = "red", size = 4)) +
   #geom_point(data = fy19_lead_time_avg, aes(x = Complexity, y = avg, color = "F8B195", size = 4, alpha = 0.8)) +
   annotate("text", x = 6.4, y = 36, family = "Poppins", size = 2.7, color = "gray20",
            label = "Large teal dots represent average \nfrom 12 months ago") +

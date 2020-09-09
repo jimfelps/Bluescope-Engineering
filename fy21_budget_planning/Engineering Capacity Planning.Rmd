@@ -1,0 +1,152 @@
+---
+title: "Engineering Capacity Planning"
+author: "Jim Felps"
+date: "12/18/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Working on engineering capacity for the FY21 budget. The org has a top-down approach to the budgeting process, which is counterintuitive but "it is what it is". I've been handed a shipped tons budget number from management, so I'm looking at the capacity we have in engineering to determine if this is possible. In finance, we suspect that the shipped tons number will not work with the current capabilities in engineering, so my hope is to quantify what headcount would be required to meet the shipped tons budget.
+
+Starting with our main reporting for engineering "Order Summary with Tons" includes all the engineered tons data for the past 12 months (in several locations, so combine first then move on with analysis). I'll be using a data dump from BI of engineering complexity by project, then assign this complexity to all orders within the project. This is one of the challenges with our system: we engineer projects, but our system is manufacturing-centric. All projects are broken into order and fed into manufacturing, but the engineering data (hours/quote) does not repeat to all orders within the project.
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(lubridate)
+library(readxl)
+
+# unable to read in this data without going to import>manually changing data type. Not sure what's going on
+#order_summary_ltm <- read_excel("~/R/R Data/Engineering/fy21_capacity_planning/order_summary_rpts/order_summary_ltm.xlsx", 
+#+     col_types = c("text", "text", "text", 
+#+         "text", "text", "text", "date", "date", 
+#+         "date", "text", "text", "text", "text", 
+#+         "text", "numeric", "numeric", "numeric", 
+#+         "numeric", "numeric", "numeric", 
+#+         "numeric", "numeric", "numeric", 
+#+         "numeric", "numeric", "numeric", 
+#+         "numeric", "numeric", "numeric", 
+#+         "numeric", "numeric", "numeric", 
+#+         "numeric", "numeric", "text", "numeric", 
+#+         "numeric", "numeric", "numeric", 
+#+         "text", "numeric", "numeric", "text", 
+#+         "numeric", "numeric", "numeric", 
+#+         "numeric", "text", "numeric", "numeric", 
+#+         "numeric", "numeric", "text", "numeric", 
+#+         "numeric", "numeric", "numeric", 
+#+         "text", "numeric", "numeric", "text", 
+#+         "numeric", "numeric"))
+
+
+eng_complexity_lookup <- read_csv("~/R/R Data/Engineering/fy21_capacity_planning/eng_complexity_lookup.csv", 
+    col_types = cols(`Order Creation Date` = col_date(format = "%m/%d/%Y"), 
+        `Order Number` = col_character())) %>%
+    clean_names(case = "snake")
+
+
+booked <- c("BO","CL","CA")
+
+```
+
+
+
+
+```{r Clean up tables and combine}
+
+
+eng_complexity_select <- eng_complexity_lookup %>%
+    mutate(proj_num = str_sub(order_number, 1, 8)) %>%
+    select(proj_num,
+           division,
+           complexity)
+
+#order_summary_w_complexity_w_bsc <- order_summary_ltm %>%
+#    clean_names(case = "snake") %>%
+#    mutate(proj_num = str_sub(order_number, 1, 8),
+#           eck_month = floor_date(eck_act_comp, "month")) %>%
+#    left_join(eng_complexity_select, by = c("proj_num" = "proj_num")) %>%
+#    mutate(complexity = if_else(str_detect(order_type, "PRT|PARTS"), "Parts Order",
+#                                if_else(str_detect(order_type, "CSS"), "CSS/HS", 
+#                                        if_else(str_detect(builder_name, "BLUESCOPE"), "BSC",
+#                                                if_else(str_detect(order_type, "LATINA"), "BLA", complexity)))),
+#           eng_tons = if_else(order_status %in% booked, eng_mfst_tons, planned_tons)) %>%
+#    select(order_number,
+#           builder_name,
+#           project_name,
+#           order_status,
+#           order_type,
+#           complexity,
+#           division,
+#           eck_month,
+#           eng_tons,
+#           budgeting_hours,
+#           actual_hours,
+#           ordered_date,
+#           eck_act_comp)
+#
+#order_summary_w_complexity_w_bsc %>%
+#    filter(complexity == "BSC") %>%
+#    summarise(tons = sum(eng_tons)) %>%
+#    View()
+
+order_summary_w_complexity <- order_summary_ltm %>%
+    clean_names(case = "snake") %>%
+    mutate(proj_num = str_sub(order_number, 1, 8),
+           eck_month = floor_date(eck_act_comp, "month")) %>%
+    left_join(eng_complexity_select, by = c("proj_num" = "proj_num")) %>%
+    mutate(complexity = if_else(str_detect(order_type, "PRT|PARTS"), "Parts Order",
+                                if_else(str_detect(order_type, "CSS"), "CSS/HS", 
+                                        if_else(str_detect(builder_name, "BLUESCOPE"), "BSC",
+                                                if_else(str_detect(order_type, "LATINA"), "BLA", complexity)))),
+           eng_tons = if_else(order_status %in% booked, eng_mfst_tons, planned_tons)) %>%
+    select(order_number,
+           builder_name,
+           project_name,
+           order_status,
+           order_type,
+           complexity,
+           division,
+           eck_month,
+           eng_tons,
+           budgeting_hours,
+           actual_hours,
+           ordered_date,
+           eck_act_comp) %>%
+    filter(!is.na(complexity),
+           complexity != "BLA")
+
+#order_summary_w_complexity %>%
+#    count(complexity) %>%
+#    View()
+#
+#order_summary_w_complexity %>%
+#    group_by(eck_month) %>%
+#    summarise(tons = sum(eng_tons)) %>%
+#    View()
+
+engineering_summary_table <- order_summary_w_complexity %>%
+    group_by(complexity) %>%
+    mutate(tons_by_complex = sum(eng_tons),
+           count_orders = n(),
+           tons_order = tons_by_complex/count_orders) %>%
+    ungroup() %>%
+    group_by(complexity) %>%
+    summarise(total_tons = mean(tons_by_complex),
+              tons_per_month = round(total_tons/12,2),
+              count_of_orders = mean(count_orders),
+              ton_per_order = round(mean(tons_order),2)) %>%
+    filter(complexity != "BLA",
+           complexity != "CSS/HS") %>%
+    mutate(all_tons = sum(total_tons),
+           pct_ton = round(total_tons/all_tons,2)) %>%
+    select(-all_tons) %>%
+    ungroup()
+
+write.csv(engineering_summary_table, "~/R/R Data/Engineering/fy21_capacity_planning/engineering_summary_table.csv")
+
+```
+
